@@ -70,8 +70,26 @@ BMX160_INT_FLAT_1_ADDR     = const(0x68)
 BMX160_FOC_CONF_ADDR       = const(0x69)
 BMX160_CONF_ADDR           = const(0x6A)
 
+BMX160_ACCEL_BW_NORMAL_AVG4 = const(0x02)
+BMX160_GYRO_BW_NORMAL_MODE  = const(0x02)
+BMX160_ACCEL_ODR_100HZ      = const(0x08)
+BMX160_GYRO_ODR_100HZ       = const(0x08)
+BMX160_ACCEL_SUSPEND_MODE   = const(0x10)
+BMX160_GYRO_SUSPEND_MODE    = const(0x14)
+BMX160_ACCEL_RANGE_2G       = const(0x03)
+BMX160_GYRO_RANGE_2000_DPS  = const(0x00)
+
+BMX160_SELF_TEST_ADDR                = const(0x6D)
+# Self test configurations
+BMX160_ACCEL_SELF_TEST_CONFIG        = const(0x2C)
+BMX160_ACCEL_SELF_TEST_POSITIVE_EN   = const(0x0D)
+BMX160_ACCEL_SELF_TEST_NEGATIVE_EN   = const(0x09)
+BMX160_ACCEL_SELF_TEST_LIMIT         = const(8192)
+
+
 # I2C address
-BMX160_I2C_ADDR            = const(0x68)
+# BMX160_I2C_ADDR            = const(0x68)
+BMX160_I2C_ADDR            = const(0x69)  # alternate address, this one seems to work!
 # Interface settings
 BMX160_SPI_INTF            = const(1)
 BMX160_I2C_INTF            = const(0)
@@ -81,27 +99,67 @@ BMX160_SPI_WR_MASK         = const(0x7F)
 class BMX160:
     """Driver for the BMX160 accelerometer, magnetometer, gyroscope."""
 
-    _BUFFER = bytearray(20)
+    _BUFFER = bytearray(40)
 
     def __init__(self):
         # soft reset & reboot
-        self._write_u8(BMX160_COMMAND_REG_ADDR, BMX160_SOFT_RESET_CMD)
+        self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_SOFT_RESET_CMD)
         time.sleep(BMX160_SOFT_RESET_DELAY_MS)
         # Check ID registers.
-        ID = self._read_u8(BMX160_CHIP_ID_ADDR)
-        print('ID: %', ID)
-        if ID != BMX160_CHIP_ID
+        ID = self.read_u8(BMX160_CHIP_ID_ADDR)
+        if ID != BMX160_CHIP_ID:
             raise RuntimeError('Could not find BMX160, check wiring!')
 
-        # Set default ranges for the various sensors
-        # self._accel_mg_lsb = None
-        # self._mag_mgauss_lsb = None
-        # self._gyro_dps_digit = None
-        # self.accel_range = ACCELRANGE_2G
-        # self.mag_gain = MAGGAIN_4GAUSS
-        # self.gyro_scale = GYROSCALE_245DPS
+        # set the default settings
+        self.settings = self.default_settings()
+        self.set_all_sensor_params()
 
+    def read_all(self):
+        self.read_bytes(BMX160_AUX_DATA_ADDR, 20, self._BUFFER)
 
+    def query_error(self):
+        return self.read_u8(BMX160_ERROR_REG_ADDR)
+
+    def set_sensor_param(self, sensor, param, value):
+        """
+        Set any sensor configuration parameter. `sensor` and `param` should be strings
+        like ("mag", "gyro", "accel"), and ("range", "config"). Case doesn't matter for these strings.
+        """
+        assert sensor.lower() in ("mag", "gyro", "accel")
+        assert param.lower() in ("range", "config")
+        register = "BMX160_" + sensor.upper() + "_" + param.upper() + "_ADDR"
+        register = globals()[register]
+        self.write_u8(register, value)
+
+    def set_all_sensor_params(self):
+        # params = self.default_settings()
+        # params.update(self.settings)
+
+        # hard coded:
+        self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_BW_NORMAL_AVG4)
+        self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_ODR_100HZ)
+        self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_ODR_100HZ)
+        self.write_u8(BMX160_ACCEL_RANGE_ADDR, BMX160_ACCEL_RANGE_2G)
+
+        self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_BW_NORMAL_MODE)
+        self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_ODR_100HZ)
+        self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_SUSPEND_MODE)
+        self.write_u8(BMX160_GYRO_RANGE_ADDR, BMX160_GYRO_RANGE_2000_DPS)
+
+    def default_settings(self):
+        """
+        Basically copied from the C version.
+        """
+        accel_settings = {"bw": BMX160_ACCEL_BW_NORMAL_AVG4,
+                          "odr": BMX160_ACCEL_ODR_100HZ,
+                          "power": BMX160_ACCEL_SUSPEND_MODE,
+                          "range": BMX160_ACCEL_RANGE_2G}
+        gyro_settings = {"bw": BMX160_GYRO_BW_NORMAL_MODE,
+                         "odr": BMX160_GYRO_ODR_100HZ,
+                         "power": BMX160_GYRO_SUSPEND_MODE,
+                         "range": BMX160_GYRO_RANGE_2000_DPS}
+
+        return {"accel": accel_settings, "gyro": gyro_settings}
 
 class BMX160_I2C(BMX160):
     """Driver for the BMX160 connect over I2C."""
@@ -109,22 +167,26 @@ class BMX160_I2C(BMX160):
         self._device = i2c_device.I2CDevice(i2c, BMX160_I2C_ADDR)
         super().__init__()
 
-    def _read_u8(self, address):
+    def read_u8(self, address):
         with self._device as i2c:
             self._BUFFER[0] = address & 0xFF
             i2c.write_then_readinto(self._BUFFER, self._BUFFER, out_end=1, in_start=1, in_end=2)
         return self._BUFFER[1]
 
-    def _read_bytes(self, address, count, buf):
+    def read_bytes(self, address, count, buf):
         with self._device as i2c:
             buf[0] = address & 0xFF
-            i2c.write_then_readinto(buf, buf, out_end=1, in_end=count)
+            # i2c.write_then_readinto(buf, buf, out_end=1, in_end=count)
+            i2c.read()
 
-    def _write_u8(self, address, val):
+        [print(hex(i),'\t',end='') for i in self._BUFFER]
+        print('')
+
+    def write_u8(self, address, val):
         with self._device as i2c:
             self._BUFFER[0] = address & 0xFF
             self._BUFFER[1] = val & 0xFF
-            i2c.write(self._BUFFER, end=2)
+            i2c.write(self._BUFFER, end=2, stop=True)
 
 
 class BMX160_SPI(BMX160):
@@ -133,20 +195,20 @@ class BMX160_SPI(BMX160):
         self._device = spi_device.SPIDevice(spi, cs)
         super().__init__()
 
-    def _read_u8(self, address):
+    def read_u8(self, address):
         with self._device as spi:
             self._BUFFER[0] = (address | 0x80) & 0xFF
             spi.write(self._BUFFER, end=1)
             spi.readinto(self._BUFFER, end=1)
         return self._BUFFER[0]
 
-    def _read_bytes(self, address, count, buf):
+    def read_bytes(self, address, count, buf):
         with self._device as spi:
             buf[0] = (address | 0x80) & 0xFF
             spi.write(buf, end=1)
             spi.readinto(buf, end=count)
 
-    def _write_u8(self, address, val):
+    def write_u8(self, address, val):
         with self._device as spi:
             self._BUFFER[0] = (address & 0x7F) & 0xFF
             self._BUFFER[1] = val & 0xFF
