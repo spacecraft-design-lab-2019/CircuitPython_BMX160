@@ -4,8 +4,7 @@ try:
 except ImportError:
     import ustruct as struct
 
-import adafruit_bus_device.i2c_device as i2c_device
-import adafruit_bus_device.spi_device as spi_device
+from adafruit_bus_device.i2c_device import I2CDevice
 from micropython import const
 
 # Chip ID
@@ -88,8 +87,8 @@ BMX160_ACCEL_SELF_TEST_LIMIT         = const(8192)
 
 
 # I2C address
-# BMX160_I2C_ADDR            = const(0x68)
-BMX160_I2C_ADDR            = const(0x69)  # alternate address, this one seems to work!
+BMX160_I2C_ADDR            = const(0x68)
+# BMX160_I2C_ADDR            = const(0x69)  # alternate address, this one seems to work!
 # Interface settings
 BMX160_SPI_INTF            = const(1)
 BMX160_I2C_INTF            = const(0)
@@ -111,9 +110,8 @@ class BMX160:
             raise RuntimeError('Could not find BMX160, check wiring!')
 
         # set the default settings
-        self.settings = self.default_settings()
-        self.set_all_sensor_params()
-
+        # self.settings = self.default_settings()
+        # self.set_all_sensor_params()
     def read_all(self):
         self.read_bytes(BMX160_AUX_DATA_ADDR, 20, self._BUFFER)
 
@@ -161,29 +159,31 @@ class BMX160:
 
         return {"accel": accel_settings, "gyro": gyro_settings}
 
+
+
+
 class BMX160_I2C(BMX160):
     """Driver for the BMX160 connect over I2C."""
+
     def __init__(self, i2c):
-        self._device = i2c_device.I2CDevice(i2c, BMX160_I2C_ADDR)
+        self.i2c_device = I2CDevice(i2c, BMX160_I2C_ADDR)
         super().__init__()
 
     def read_u8(self, address):
-        with self._device as i2c:
+        with self.i2c_device as i2c:
             self._BUFFER[0] = address & 0xFF
             i2c.write_then_readinto(self._BUFFER, self._BUFFER, out_end=1, in_start=1, in_end=2)
         return self._BUFFER[1]
 
     def read_bytes(self, address, count, buf):
-        with self._device as i2c:
+        with self.i2c_device as i2c:
             buf[0] = address & 0xFF
-            # i2c.write_then_readinto(buf, buf, out_end=1, in_end=count)
-            i2c.read()
-
+            i2c.write_then_readinto(buf, buf, out_end=1, in_end=count)
         [print(hex(i),'\t',end='') for i in self._BUFFER]
         print('')
 
     def write_u8(self, address, val):
-        with self._device as i2c:
+        with self.i2c_device as i2c:
             self._BUFFER[0] = address & 0xFF
             self._BUFFER[1] = val & 0xFF
             i2c.write(self._BUFFER, end=2, stop=True)
@@ -192,24 +192,24 @@ class BMX160_I2C(BMX160):
 class BMX160_SPI(BMX160):
     """Driver for the BMX160 connect over SPI."""
     def __init__(self, spi, cs):
-        self._device = spi_device.SPIDevice(spi, cs)
+        self.i2c_device = spi_device.SPIDevice(spi, cs)
         super().__init__()
 
     def read_u8(self, address):
-        with self._device as spi:
+        with self.i2c_device as spi:
             self._BUFFER[0] = (address | 0x80) & 0xFF
             spi.write(self._BUFFER, end=1)
             spi.readinto(self._BUFFER, end=1)
         return self._BUFFER[0]
 
     def read_bytes(self, address, count, buf):
-        with self._device as spi:
+        with self.i2c_device as spi:
             buf[0] = (address | 0x80) & 0xFF
             spi.write(buf, end=1)
             spi.readinto(buf, end=count)
 
     def write_u8(self, address, val):
-        with self._device as spi:
+        with self.i2c_device as spi:
             self._BUFFER[0] = (address & 0x7F) & 0xFF
             self._BUFFER[1] = val & 0xFF
             spi.write(self._BUFFER, end=2)
