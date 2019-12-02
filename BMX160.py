@@ -73,8 +73,6 @@ BMX160_ACCEL_BW_NORMAL_AVG4 = const(0x02)
 BMX160_GYRO_BW_NORMAL_MODE  = const(0x02)
 BMX160_ACCEL_ODR_100HZ      = const(0x08)
 BMX160_GYRO_ODR_100HZ       = const(0x08)
-BMX160_ACCEL_SUSPEND_MODE   = const(0x10)
-BMX160_GYRO_SUSPEND_MODE    = const(0x14)
 BMX160_ACCEL_RANGE_2G       = const(0x03)
 BMX160_GYRO_RANGE_2000_DPS  = const(0x00)
 
@@ -84,6 +82,22 @@ BMX160_ACCEL_SELF_TEST_CONFIG        = const(0x2C)
 BMX160_ACCEL_SELF_TEST_POSITIVE_EN   = const(0x0D)
 BMX160_ACCEL_SELF_TEST_NEGATIVE_EN   = const(0x09)
 BMX160_ACCEL_SELF_TEST_LIMIT         = const(8192)
+
+# Power mode settings
+# Accel power mode
+BMX160_ACCEL_NORMAL_MODE             = const(0x11)
+BMX160_ACCEL_LOWPOWER_MODE           = const(0x12)
+BMX160_ACCEL_SUSPEND_MODE            = const(0x10)
+
+# Gyro power mode
+BMX160_GYRO_SUSPEND_MODE             = const(0x14)
+BMX160_GYRO_NORMAL_MODE              = const(0x15)
+BMX160_GYRO_FASTSTARTUP_MODE         = const(0x17)
+
+# Aux power mode
+BMX160_AUX_SUSPEND_MODE              = const(0x18)
+BMX160_AUX_NORMAL_MODE               = const(0x19)
+BMX160_AUX_LOWPOWER_MODE             = const(0x1A)
 
 
 # I2C address
@@ -125,7 +139,7 @@ class BMX160:
 
 
     def read_all(self):
-        self.read_bytes(BMX160_MAG_DATA_ADDR, 40, self._BUFFER)
+        self.read_bytes(BMX160_MAG_DATA_ADDR, 20, self._BUFFER)
 
     def gyro(self):
         self.read_bytes(BMX160_GYRO_DATA_ADDR, 6, self._smallbuf)
@@ -154,25 +168,25 @@ class BMX160:
         if param.lower() != "range":
             param = "config" #TODO enumerate allowed keywords.
 
-        register = "BMX160_" + sensor.upper() + "_" + param.upper() + "_ADDR"
-        try:
-            register = globals()[register]
-        except:
+        # registername = "BMX160_" + sensor.upper() + "_" + param.upper() + "_ADDR"
+        registername = "BMX160_COMMAND_REG_ADDR"
+        if registername in globals():
+            register = globals()[registername]
+            self.write_u8(register, value)
+        else:
             print("WARNING: no register found corresponding to setting {}".format(param.upper()))
 
-        self.write_u8(register, value)
-
     def apply_sensor_params(self, settings = None):
-        if settings = None:
+        if settings == None:
             settings = self.settings
 
         params = self.default_settings()
         params.update(settings)
 
-        for key, val in params["accel"]:
+        for key, val in params["accel"].items():
             self.set_sensor_param("accel", key, val)
 
-        for key, val in params["gyro"]:
+        for key, val in params["gyro"].items():
             self.set_sensor_param("gyro", key, val)
 
         # for key, val in params["mag"]:
@@ -182,14 +196,18 @@ class BMX160:
         """
         Basically copied from the C version.
         """
-        accel_settings = {"bw": BMX160_ACCEL_BW_NORMAL_AVG4,
+        accel_settings = {
+                          "bw": BMX160_ACCEL_BW_NORMAL_AVG4,
                           "odr": BMX160_ACCEL_ODR_100HZ,
-                          "power": BMX160_ACCEL_SUSPEND_MODE,
-                          "range": BMX160_ACCEL_RANGE_2G}
-        gyro_settings = {"bw": BMX160_GYRO_BW_NORMAL_MODE,
+                          "power": BMX160_ACCEL_NORMAL_MODE,
+                          # "range": BMX160_ACCEL_RANGE_2G
+                          }
+        gyro_settings = {
+                         "bw": BMX160_GYRO_BW_NORMAL_MODE,
                          "odr": BMX160_GYRO_ODR_100HZ,
-                         "power": BMX160_GYRO_SUSPEND_MODE,
-                         "range": BMX160_GYRO_RANGE_2000_DPS}
+                         "power": BMX160_GYRO_NORMAL_MODE,
+                         # "range": BMX160_GYRO_RANGE_2000_DPS
+                         }
 
         return {"accel": accel_settings, "gyro": gyro_settings}
 
