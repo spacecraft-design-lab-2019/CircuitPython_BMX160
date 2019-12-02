@@ -1,7 +1,7 @@
 import time
 import board
 import busio, bmx160
- 
+
 i2c = busio.I2C(board.SCL, board.SDA)
 
 bmx = bmx160.BMX160_I2C(i2c)
@@ -20,5 +20,14 @@ bmx.write_u8(address=0x7E,val=0xB0) # clear FIFO
 bmx.write_u8(address=0x7E,val=0xB1) # reset interrupts
 print('PMU_STATUS:\t',hex(bmx.read_u8(0x03)))
 
-time.sleep(1)
+
 bmx.read_all()
+for b in bmx._BUFFER:
+    print(b, end = ", ")
+
+for i in range(10):
+    print()
+    print("gyro:", bmx.gyro())
+    print("accel:", bmx.accel())
+    print("mag:", bmx.mag())
+    time.sleep(1)

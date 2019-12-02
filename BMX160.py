@@ -21,7 +21,7 @@ BMX160_COMMAND_REG_ADDR    = const(0x7E)
 BMX160_CHIP_ID_ADDR        = const(0x00)
 BMX160_ERROR_REG_ADDR      = const(0x02)
 BMX160_PMU_STATUS_ADDR     = const(0x03)
-BMX160_AUX_DATA_ADDR       = const(0x04)
+BMX160_MAG_DATA_ADDR       = const(0x04)
 BMX160_GYRO_DATA_ADDR      = const(0x0C)
 BMX160_ACCEL_DATA_ADDR     = const(0x12)
 BMX160_STATUS_ADDR         = const(0x1B)
@@ -87,8 +87,8 @@ BMX160_ACCEL_SELF_TEST_LIMIT         = const(8192)
 
 
 # I2C address
-BMX160_I2C_ADDR            = const(0x68)
-# BMX160_I2C_ADDR            = const(0x69)  # alternate address, this one seems to work!
+# BMX160_I2C_ADDR            = const(0x68)
+BMX160_I2C_ADDR            = const(0x69)  # alternate address, this one seems to work!
 # Interface settings
 BMX160_SPI_INTF            = const(1)
 BMX160_I2C_INTF            = const(0)
@@ -96,9 +96,19 @@ BMX160_SPI_RD_MASK         = const(0x80)
 BMX160_SPI_WR_MASK         = const(0x7F)
 
 class BMX160:
-    """Driver for the BMX160 accelerometer, magnetometer, gyroscope."""
+    """
+    Driver for the BMX160 accelerometer, magnetometer, gyroscope.
+
+    In the buffer, bytes are allocated as follows:
+        - mag x6
+        - rhall x2 (not relevant)
+        - gyro x6
+        - accel x6
+
+    """
 
     _BUFFER = bytearray(40)
+    _smallbuf = bytearray(6)
 
     def __init__(self):
         # soft reset & reboot
@@ -110,13 +120,30 @@ class BMX160:
             raise RuntimeError('Could not find BMX160, check wiring!')
 
         # set the default settings
-        # self.settings = self.default_settings()
-        # self.set_all_sensor_params()
+        self.settings = self.default_settings()
+        self.apply_sensor_params()
+
+
     def read_all(self):
-        self.read_bytes(BMX160_AUX_DATA_ADDR, 20, self._BUFFER)
+        self.read_bytes(BMX160_MAG_DATA_ADDR, 40, self._BUFFER)
+
+    def gyro(self):
+        self.read_bytes(BMX160_GYRO_DATA_ADDR, 6, self._smallbuf)
+        return decode_sensor(self._smallbuf)
+
+    def mag(self):
+        self.read_bytes(BMX160_MAG_DATA_ADDR, 6, self._smallbuf)
+        return decode_sensor(self._smallbuf)
+
+    def accel(self):
+        self.read_bytes(BMX160_ACCEL_DATA_ADDR, 6, self._smallbuf)
+        return decode_sensor(self._smallbuf)
 
     def query_error(self):
         return self.read_u8(BMX160_ERROR_REG_ADDR)
+
+    def clear_settings(self):
+        self.setting.clear()
 
     def set_sensor_param(self, sensor, param, value):
         """
@@ -124,25 +151,32 @@ class BMX160:
         like ("mag", "gyro", "accel"), and ("range", "config"). Case doesn't matter for these strings.
         """
         assert sensor.lower() in ("mag", "gyro", "accel")
-        assert param.lower() in ("range", "config")
+        if param.lower() != "range":
+            param = "config" #TODO enumerate allowed keywords.
+
         register = "BMX160_" + sensor.upper() + "_" + param.upper() + "_ADDR"
-        register = globals()[register]
+        try:
+            register = globals()[register]
+        except:
+            print("WARNING: no register found corresponding to setting {}".format(param.upper()))
+
         self.write_u8(register, value)
 
-    def set_all_sensor_params(self):
-        # params = self.default_settings()
-        # params.update(self.settings)
+    def apply_sensor_params(self, settings = None):
+        if settings = None:
+            settings = self.settings
 
-        # hard coded:
-        self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_BW_NORMAL_AVG4)
-        self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_ODR_100HZ)
-        self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_ODR_100HZ)
-        self.write_u8(BMX160_ACCEL_RANGE_ADDR, BMX160_ACCEL_RANGE_2G)
+        params = self.default_settings()
+        params.update(settings)
 
-        self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_BW_NORMAL_MODE)
-        self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_ODR_100HZ)
-        self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_SUSPEND_MODE)
-        self.write_u8(BMX160_GYRO_RANGE_ADDR, BMX160_GYRO_RANGE_2000_DPS)
+        for key, val in params["accel"]:
+            self.set_sensor_param("accel", key, val)
+
+        for key, val in params["gyro"]:
+            self.set_sensor_param("gyro", key, val)
+
+        # for key, val in params["mag"]:
+            # self.set_sensor_param("mag", key, val)
 
     def default_settings(self):
         """
@@ -179,8 +213,6 @@ class BMX160_I2C(BMX160):
         with self.i2c_device as i2c:
             buf[0] = address & 0xFF
             i2c.write_then_readinto(buf, buf, out_end=1, in_end=count)
-        [print(hex(i),'\t',end='') for i in self._BUFFER]
-        print('')
 
     def write_u8(self, address, val):
         with self.i2c_device as i2c:
@@ -213,3 +245,13 @@ class BMX160_SPI(BMX160):
             self._BUFFER[0] = (address & 0x7F) & 0xFF
             self._BUFFER[1] = val & 0xFF
             spi.write(self._BUFFER, end=2)
+
+## UTILS:
+
+def bytestoint(lsb, msb): return (msb << 8) | lsb
+
+def decode_sensor(arr):
+    x = bytestoint(arr[0], arr[1])
+    y = bytestoint(arr[2], arr[3])
+    z = bytestoint(arr[4], arr[5])
+    return (x, y, z)
