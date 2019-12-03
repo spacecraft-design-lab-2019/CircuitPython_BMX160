@@ -21,6 +21,7 @@ BMX160_COMMAND_REG_ADDR    = const(0x7E)
 BMX160_CHIP_ID_ADDR        = const(0x00)
 BMX160_ERROR_REG_ADDR      = const(0x02)
 BMX160_PMU_STATUS_ADDR     = const(0x03)
+BMX160_SENSOR_TIME_ADDR    = const(0x18)
 BMX160_MAG_DATA_ADDR       = const(0x04)
 BMX160_GYRO_DATA_ADDR      = const(0x0C)
 BMX160_ACCEL_DATA_ADDR     = const(0x12)
@@ -202,23 +203,26 @@ class BMX160:
     def read_all(self):
         self.read_bytes(BMX160_MAG_DATA_ADDR, 20, self._BUFFER)
 
-    def gyro(self):
-        self.read_bytes(BMX160_GYRO_DATA_ADDR, 6, self._smallbuf)
-        return decode_sensor(self._smallbuf)
+    def query_error(self): return self.read_u8(BMX160_ERROR_REG_ADDR)
 
-    def mag(self):
-        self.read_bytes(BMX160_MAG_DATA_ADDR, 6, self._smallbuf)
-        return decode_sensor(self._smallbuf)
+    # NOTE, these share a buffer! Can't call two in a row! Either make a wrapper for a buffer slice
+    # to allow partial passing or copy the buffer to return or completely hide this API
+    def gyro_raw(self):  return self.read_bytes(BMX160_GYRO_DATA_ADDR, 6, self._smallbuf)
+    def accel_raw(self): return self.read_bytes(BMX160_ACCEL_DATA_ADDR, 6, self._smallbuf)
+    def mag_raw(self):   return self.read_bytes(BMX160_MAG_DATA_ADDR, 6, self._smallbuf)
+    def sensortime_raw(self):  return self.read_bytes(BMX160_SENSOR_TIME_ADDR, 3, self._smallbuf)
 
-    def accel(self):
-        self.read_bytes(BMX160_ACCEL_DATA_ADDR, 6, self._smallbuf)
-        return decode_sensor(self._smallbuf)
+    # ACTUAL API
+    def gyro(self):  return decode_sensor(self.gyro_raw())
+    def accel(self): return decode_sensor(self.accel_raw())
+    def mag(self):   return decode_sensor(self.mag_raw())
+    def sensortime(self):
+        tbuf = self.sensortime_raw()
+        t0, t1, t2 = tbuf[:2]
+        return (t2 << 16) | (t1 << 8) | t0
 
-    def query_error(self):
-        return self.read_u8(BMX160_ERROR_REG_ADDR)
-
-    def clear_settings(self):
-        self.setting.clear()
+    # SETTINGS RELATED:
+    def clear_settings(self): self.setting.clear()
 
     def set_sensor_param(self, sensor, param, value):
         """
