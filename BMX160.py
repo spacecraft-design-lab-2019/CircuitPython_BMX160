@@ -37,6 +37,7 @@ BMX160_MAG_ODR_ADDR        = const(0x44)
 BMX160_FIFO_DOWN_ADDR      = const(0x45)
 BMX160_FIFO_CONFIG_0_ADDR  = const(0x46)
 BMX160_FIFO_CONFIG_1_ADDR  = const(0x47)
+# BMX160_MAG_IF_0_ADDR       = const(0x4B)
 BMX160_MAG_IF_0_ADDR       = const(0x4C)
 BMX160_MAG_IF_1_ADDR       = const(0x4D)
 BMX160_MAG_IF_2_ADDR       = const(0x4E)
@@ -217,7 +218,7 @@ class BMX160:
     @property
     def sensortime(self):
         tbuf = self.sensortime_raw()
-        t0, t1, t2 = tbuf[:2]
+        t0, t1, t2 = tbuf[:3]
         return (t2 << 16) | (t1 << 8) | t0
 
     # NOTE, these share a buffer! Can't call two in a row! Either make a wrapper for a buffer slice
