@@ -72,8 +72,6 @@ BMX160_CONF_ADDR           = const(0x6A)
 
 BMX160_ACCEL_BW_NORMAL_AVG4 = const(0x02)
 BMX160_GYRO_BW_NORMAL_MODE  = const(0x02)
-BMX160_ACCEL_ODR_100HZ      = const(0x08)
-BMX160_GYRO_ODR_100HZ       = const(0x08)
 BMX160_ACCEL_RANGE_2G       = const(0x03)
 BMX160_GYRO_RANGE_2000_DPS  = const(0x00)
 
@@ -139,18 +137,18 @@ BMX160_GYRO_ODR_1600HZ               = const(0x0C)
 BMX160_GYRO_ODR_3200HZ               = const(0x0D)
 
 # Auxiliary sensor Output data rate
-BMX160_AUX_ODR_RESERVED              = const(0x00)
-BMX160_AUX_ODR_0_78HZ                = const(0x01)
-BMX160_AUX_ODR_1_56HZ                = const(0x02)
-BMX160_AUX_ODR_3_12HZ                = const(0x03)
-BMX160_AUX_ODR_6_25HZ                = const(0x04)
-BMX160_AUX_ODR_12_5HZ                = const(0x05)
-BMX160_AUX_ODR_25HZ                  = const(0x06)
-BMX160_AUX_ODR_50HZ                  = const(0x07)
-BMX160_AUX_ODR_100HZ                 = const(0x08)
-BMX160_AUX_ODR_200HZ                 = const(0x09)
-BMX160_AUX_ODR_400HZ                 = const(0x0A)
-BMX160_AUX_ODR_800HZ                 = const(0x0B)
+BMX160_MAG_ODR_RESERVED              = const(0x00)
+BMX160_MAG_ODR_0_78HZ                = const(0x01)
+BMX160_MAG_ODR_1_56HZ                = const(0x02)
+BMX160_MAG_ODR_3_12HZ                = const(0x03)
+BMX160_MAG_ODR_6_25HZ                = const(0x04)
+BMX160_MAG_ODR_12_5HZ                = const(0x05)
+BMX160_MAG_ODR_25HZ                  = const(0x06)
+BMX160_MAG_ODR_50HZ                  = const(0x07)
+BMX160_MAG_ODR_100HZ                 = const(0x08)
+BMX160_MAG_ODR_200HZ                 = const(0x09)
+BMX160_MAG_ODR_400HZ                 = const(0x0A)
+BMX160_MAG_ODR_800HZ                 = const(0x0B)
 
 # Accel, gyro and aux. sensor length and also their combined length definitions in FIFO
 BMX160_FIFO_G_LENGTH                 = const(6)
@@ -170,6 +168,7 @@ BMX160_I2C_INTF            = const(0)
 BMX160_SPI_RD_MASK         = const(0x80)
 BMX160_SPI_WR_MASK         = const(0x7F)
 
+
 class BMX160:
     """
     Driver for the BMX160 accelerometer, magnetometer, gyroscope.
@@ -180,7 +179,6 @@ class BMX160:
         - gyro 8-13
         - accel 14-19
         - sensor time 20-22
-
     """
 
     _BUFFER = bytearray(40)
@@ -200,10 +198,27 @@ class BMX160:
         self.apply_sensor_params()
 
 
-    def read_all(self):
-        self.read_bytes(BMX160_MAG_DATA_ADDR, 20, self._BUFFER)
+    ######################## SENSOR API ########################
+
+    def read_all(self): return self.read_bytes(BMX160_MAG_DATA_ADDR, 20, self._BUFFER)
 
     def query_error(self): return self.read_u8(BMX160_ERROR_REG_ADDR)
+
+    ### ACTUAL API
+    @property
+    def gyro(self):  return decode_sensor(self.gyro_raw())
+
+    @property
+    def accel(self): return decode_sensor(self.accel_raw())
+
+    @property
+    def mag(self):   return decode_sensor(self.mag_raw())
+
+    @property
+    def sensortime(self):
+        tbuf = self.sensortime_raw()
+        t0, t1, t2 = tbuf[:2]
+        return (t2 << 16) | (t1 << 8) | t0
 
     # NOTE, these share a buffer! Can't call two in a row! Either make a wrapper for a buffer slice
     # to allow partial passing or copy the buffer to return or completely hide this API
@@ -212,17 +227,8 @@ class BMX160:
     def mag_raw(self):   return self.read_bytes(BMX160_MAG_DATA_ADDR, 6, self._smallbuf)
     def sensortime_raw(self):  return self.read_bytes(BMX160_SENSOR_TIME_ADDR, 3, self._smallbuf)
 
-    # ACTUAL API
-    def gyro(self):  return decode_sensor(self.gyro_raw())
-    def accel(self): return decode_sensor(self.accel_raw())
-    def mag(self):   return decode_sensor(self.mag_raw())
-    def sensortime(self):
-        tbuf = self.sensortime_raw()
-        t0, t1, t2 = tbuf[:2]
-        return (t2 << 16) | (t1 << 8) | t0
-
-    # SETTINGS RELATED:
-    def clear_settings(self): self.setting.clear()
+    ######################## SETTINGS RELATED ########################
+    def clear_settings(self): self.settings.clear()
 
     def set_sensor_param(self, sensor, param, value):
         """
@@ -276,9 +282,9 @@ class BMX160:
                          }
 
         mag_settings = {
-                         "bw": BMX160_MAG_BW_NORMAL_MODE,
-                         "odr": BMX160_MAG_ODR_100HZ,
-                         "power": BMX160_MAG_NORMAL_MODE,
+                         # "bw": BMX160_MAG_BW_NORMAL_MODE,
+                         # "odr": BMX160_MAG_ODR_100HZ,
+                         # "power": BMX160_MAG_NORMAL_MODE,
                          # "range": BMX160_GYRO_RANGE_2000_DPS
                          }
 
@@ -287,27 +293,31 @@ class BMX160:
 
 
 
+
 class BMX160_I2C(BMX160):
     """Driver for the BMX160 connect over I2C."""
 
     def __init__(self, i2c):
+
         try:
             self.i2c_device = I2CDevice(i2c, BMX160_I2C_ADDR)
         except:
             self.i2c_device = I2CDevice(i2c, BMX160_I2C_ALT_ADDR)
+
         super().__init__()
 
     def read_u8(self, address):
         with self.i2c_device as i2c:
             self._BUFFER[0] = address & 0xFF
             i2c.write_then_readinto(self._BUFFER, self._BUFFER, out_end=1, in_start=1, in_end=2)
-        return self._BUFFER[address]
+        return self._BUFFER[1]
 
     def read_bytes(self, address, count, buf):
         with self.i2c_device as i2c:
             buf[0] = address & 0xFF
             i2c.write_then_readinto(buf, buf, out_end=1, in_end=count)
         return buf
+
     def write_u8(self, address, val):
         with self.i2c_device as i2c:
             self._BUFFER[0] = address & 0xFF
@@ -326,7 +336,7 @@ class BMX160_SPI(BMX160):
             self._BUFFER[0] = (address | 0x80) & 0xFF
             spi.write(self._BUFFER, end=1)
             spi.readinto(self._BUFFER, end=1)
-        return self._BUFFER[address]
+        return self._BUFFER[0]
 
     def read_bytes(self, address, count, buf):
         with self.i2c_device as spi:

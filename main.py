@@ -27,7 +27,7 @@ for b in bmx._BUFFER:
 
 for i in range(10):
     print()
-    print("gyro:", bmx.gyro())
-    print("accel:", bmx.accel())
-    print("mag:", bmx.mag())
+    print("gyro:", bmx.gyro)
+    print("accel:", bmx.accel)
+    print("mag:", bmx.mag)
     time.sleep(1)
