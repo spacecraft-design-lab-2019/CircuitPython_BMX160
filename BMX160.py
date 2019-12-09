@@ -37,11 +37,10 @@ BMX160_MAG_ODR_ADDR        = const(0x44)
 BMX160_FIFO_DOWN_ADDR      = const(0x45)
 BMX160_FIFO_CONFIG_0_ADDR  = const(0x46)
 BMX160_FIFO_CONFIG_1_ADDR  = const(0x47)
-BMX160_MAG_IF_0_ADDR       = const(0x4B)
-BMX160_MAG_IF_1_ADDR       = const(0x4C)
-BMX160_MAG_IF_2_ADDR       = const(0x4D)
-BMX160_MAG_IF_3_ADDR       = const(0x4E)
-BMX160_MAG_IF_4_ADDR       = const(0x4F)
+BMX160_MAG_IF_0_ADDR       = const(0x4C)
+BMX160_MAG_IF_1_ADDR       = const(0x4D)
+BMX160_MAG_IF_2_ADDR       = const(0x4E)
+BMX160_MAG_IF_3_ADDR       = const(0x4F)
 BMX160_INT_ENABLE_0_ADDR   = const(0x50)
 BMX160_INT_ENABLE_1_ADDR   = const(0x51)
 BMX160_INT_ENABLE_2_ADDR   = const(0x52)
@@ -195,6 +194,7 @@ class BMX160:
 
         # set the default settings
         self.settings = self.default_settings()
+        self.init_mag()
         self.apply_sensor_params()
 
 
@@ -290,6 +290,30 @@ class BMX160:
 
         return {"accel": accel_settings, "gyro": gyro_settings, "mag": mag_settings}
 
+    def init_mag(self):
+        # see pg 25 of: https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMX160-DS000.pdf
+        self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_MAG_NORMAL_MODE)
+        time.sleep(0.00065) # datasheet says wait for 650microsec
+        self.write_u8(BMX160_MAG_IF_0_ADDR, 0x80)
+        # put mag into sleep mode
+        self.write_u8(BMX160_MAG_IF_3_ADDR, 0x01)
+        self.write_u8(BMX160_MAG_IF_2_ADDR, 0x4B)
+        # set x-y to low power preset
+        self.write_u8(BMX160_MAG_IF_3_ADDR, 0x01)
+        self.write_u8(BMX160_MAG_IF_2_ADDR, 0x51)
+        # set z to regular preset
+        self.write_u8(BMX160_MAG_IF_3_ADDR, 0x0E)
+        self.write_u8(BMX160_MAG_IF_2_ADDR, 0x52)
+        # prepare MAG_IF[1-3] for mag_if data mode
+        self.write_u8(BMX160_MAG_IF_3_ADDR, 0x02)
+        self.write_u8(BMX160_MAG_IF_2_ADDR, 0x4C)
+        self.write_u8(BMX160_MAG_IF_1_ADDR, 0x42)
+        # Set ODR to 12.5 Hz
+        self.write_u8(BMX160_MAG_ODR_ADDR, BMX160_MAG_ODR_12_5HZ)
+        self.write_u8(BMX160_MAG_IF_0_ADDR, 0x00)
+        # put in low power mode.
+        self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_MAG_LOWPOWER_MODE)
+        time.sleep(0.1) # takes this long to warm up (empirically)
 
 
 
