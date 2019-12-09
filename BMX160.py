@@ -271,13 +271,13 @@ class BMX160:
         """
         accel_settings = {
                           "bw": BMX160_ACCEL_BW_NORMAL_AVG4,
-                          "odr": BMX160_ACCEL_ODR_100HZ,
+                          "odr": BMX160_ACCEL_ODR_25HZ,
                           "power": BMX160_ACCEL_NORMAL_MODE,
                           # "range": BMX160_ACCEL_RANGE_2G
                           }
         gyro_settings = {
                          "bw": BMX160_GYRO_BW_NORMAL_MODE,
-                         "odr": BMX160_GYRO_ODR_100HZ,
+                         "odr": BMX160_GYRO_ODR_25HZ,
                          "power": BMX160_GYRO_NORMAL_MODE,
                          # "range": BMX160_GYRO_RANGE_2000_DPS
                          }
@@ -299,8 +299,8 @@ class BMX160:
         # put mag into sleep mode
         self.write_u8(BMX160_MAG_IF_3_ADDR, 0x01)
         self.write_u8(BMX160_MAG_IF_2_ADDR, 0x4B)
-        # set x-y to low power preset
-        self.write_u8(BMX160_MAG_IF_3_ADDR, 0x01)
+        # set x-y to regular power preset
+        self.write_u8(BMX160_MAG_IF_3_ADDR, 0x04)
         self.write_u8(BMX160_MAG_IF_2_ADDR, 0x51)
         # set z to regular preset
         self.write_u8(BMX160_MAG_IF_3_ADDR, 0x0E)
@@ -309,8 +309,8 @@ class BMX160:
         self.write_u8(BMX160_MAG_IF_3_ADDR, 0x02)
         self.write_u8(BMX160_MAG_IF_2_ADDR, 0x4C)
         self.write_u8(BMX160_MAG_IF_1_ADDR, 0x42)
-        # Set ODR to 12.5 Hz
-        self.write_u8(BMX160_MAG_ODR_ADDR, BMX160_MAG_ODR_12_5HZ)
+        # Set ODR to 25 Hz
+        self.write_u8(BMX160_MAG_ODR_ADDR, BMX160_MAG_ODR_25HZ)
         self.write_u8(BMX160_MAG_IF_0_ADDR, 0x00)
         # put in low power mode.
         self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_MAG_LOWPOWER_MODE)
