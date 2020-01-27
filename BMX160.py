@@ -5,6 +5,7 @@ except ImportError:
     import ustruct as struct
 
 from adafruit_bus_device.i2c_device import I2CDevice
+from adafruit_bus_device.spi_device import SPIDevice
 from micropython import const
 
 # Chip ID
@@ -353,7 +354,7 @@ class BMX160_I2C(BMX160):
 class BMX160_SPI(BMX160):
     """Driver for the BMX160 connect over SPI."""
     def __init__(self, spi, cs):
-        self.i2c_device = spi_device.SPIDevice(spi, cs)
+        self.i2c_device = SPIDevice(spi, cs)
         super().__init__()
 
     def read_u8(self, address):
