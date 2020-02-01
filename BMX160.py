@@ -73,8 +73,6 @@ BMX160_CONF_ADDR           = const(0x6A)
 
 BMX160_ACCEL_BW_NORMAL_AVG4 = const(0x02)
 BMX160_GYRO_BW_NORMAL_MODE  = const(0x02)
-BMX160_ACCEL_RANGE_2G       = const(0x03)
-BMX160_GYRO_RANGE_2000_DPS  = const(0x00)
 
 BMX160_SELF_TEST_ADDR                = const(0x6D)
 # Self test configurations
@@ -98,6 +96,20 @@ BMX160_GYRO_FASTSTARTUP_MODE         = const(0x17)
 BMX160_MAG_SUSPEND_MODE              = const(0x18)
 BMX160_MAG_NORMAL_MODE               = const(0x19)
 BMX160_MAG_LOWPOWER_MODE             = const(0x1A)
+
+# Accel Range
+BMI160_ACCEL_RANGE_2G                = const(0x03)
+BMI160_ACCEL_RANGE_4G                = const(0x05)
+BMI160_ACCEL_RANGE_8G                = const(0x08)
+BMI160_ACCEL_RANGE_16G               = const(0x0C)
+
+# Gyro Range
+BMI160_GYRO_RANGE_2000_DPS           = const(0x00)
+BMI160_GYRO_RANGE_1000_DPS           = const(0x01)
+BMI160_GYRO_RANGE_500_DPS            = const(0x02)
+BMI160_GYRO_RANGE_250_DPS            = const(0x03)
+BMI160_GYRO_RANGE_125_DPS            = const(0x04)
+
 
 # Delay in ms settings
 BMX160_ACCEL_DELAY_MS                = const(5)
@@ -137,6 +149,7 @@ BMX160_GYRO_ODR_800HZ                = const(0x0B)
 BMX160_GYRO_ODR_1600HZ               = const(0x0C)
 BMX160_GYRO_ODR_3200HZ               = const(0x0D)
 
+
 # Auxiliary sensor Output data rate
 BMX160_MAG_ODR_RESERVED              = const(0x00)
 BMX160_MAG_ODR_0_78HZ                = const(0x01)
@@ -169,6 +182,8 @@ BMX160_I2C_INTF            = const(0)
 BMX160_SPI_RD_MASK         = const(0x80)
 BMX160_SPI_WR_MASK         = const(0x7F)
 
+# Error related
+BMX160_OK                  = const(0)
 
 class BMX160:
     """
@@ -279,6 +294,37 @@ class BMX160:
                          }
 
         return {"accel": accel_settings, "gyro": gyro_settings, "mag": mag_settings}
+
+    @property
+    def gyro_range(self):
+        return self._gyro_range
+
+    @gyro_range.setter
+    def gyro_range(self, range):
+        """
+        Set the range of the gyroscope. The possible ranges are
+        2000, 1000, 500, 250, and 125 degree/second.
+        """
+        if range >= 2000:
+            range = 2000
+            bmxconst = BMX160_GYRO_RANGE_2000_DPS
+        elif range >= 1000:
+            range = 1000
+            bmxconst = BMX160_GYRO_RANGE_1000_DPS
+        elif range >= 500:
+            range = 500
+            bmxconst = BMX160_GYRO_RANGE_500_DPS
+        elif range >= 250:
+            range = 250
+            bmxconst = BMX160_GYRO_RANGE_250_DPS
+        else:
+            range = 125
+            bmxconst = BMX160_GYRO_RANGE_125_DPS
+
+        self.write_u8(BMX160_GYRO_RANGE_ADDR, range)
+        if self.query_error() == BMX160_OK:
+            self._gyro_range = range
+
 
     def init_mag(self):
         # see pg 25 of: https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMX160-DS000.pdf
