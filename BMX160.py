@@ -98,17 +98,17 @@ BMX160_MAG_NORMAL_MODE               = const(0x19)
 BMX160_MAG_LOWPOWER_MODE             = const(0x1A)
 
 # Accel Range
-BMI160_ACCEL_RANGE_2G                = const(0x03)
-BMI160_ACCEL_RANGE_4G                = const(0x05)
-BMI160_ACCEL_RANGE_8G                = const(0x08)
-BMI160_ACCEL_RANGE_16G               = const(0x0C)
+BMX160_ACCEL_RANGE_2G                = const(0x03)
+BMX160_ACCEL_RANGE_4G                = const(0x05)
+BMX160_ACCEL_RANGE_8G                = const(0x08)
+BMX160_ACCEL_RANGE_16G               = const(0x0C)
 
 # Gyro Range
-BMI160_GYRO_RANGE_2000_DPS           = const(0x00)
-BMI160_GYRO_RANGE_1000_DPS           = const(0x01)
-BMI160_GYRO_RANGE_500_DPS            = const(0x02)
-BMI160_GYRO_RANGE_250_DPS            = const(0x03)
-BMI160_GYRO_RANGE_125_DPS            = const(0x04)
+BMX160_GYRO_RANGE_2000_DPS           = const(0x00)
+BMX160_GYRO_RANGE_1000_DPS           = const(0x01)
+BMX160_GYRO_RANGE_500_DPS            = const(0x02)
+BMX160_GYRO_RANGE_250_DPS            = const(0x03)
+BMX160_GYRO_RANGE_125_DPS            = const(0x04)
 
 
 # Delay in ms settings
@@ -303,7 +303,8 @@ class BMX160:
     def gyro_range(self, range):
         """
         Set the range of the gyroscope. The possible ranges are
-        2000, 1000, 500, 250, and 125 degree/second.
+        2000, 1000, 500, 250, and 125 degree/second. Note, setting a value between the possible ranges
+        will round *downwards*. A value of e.g. 250 means the sensor can measure +/-250 deg/sec
         """
         if range >= 2000:
             range = 2000
@@ -321,10 +322,37 @@ class BMX160:
             range = 125
             bmxconst = BMX160_GYRO_RANGE_125_DPS
 
-        self.write_u8(BMX160_GYRO_RANGE_ADDR, range)
+        self.write_u8(BMX160_GYRO_RANGE_ADDR, bmxconst)
         if self.query_error() == BMX160_OK:
             self._gyro_range = range
 
+    @property
+    def accel_range(self):
+        return self._accel_range
+
+    @accel_range.setter
+    def accel_range(self, range):
+        """
+        Set the range of the accelerometer. The possible ranges are 16, 8, 4, and 2 Gs.
+        Note, setting a value between the possible ranges will round *downwards*.
+        A value of e.g. 2 means the sensor can measure +/-2 G
+        """
+        if range >= 16:
+            range = 16
+            bmxconst = BMX160_ACCEL_RANGE_16G
+        elif range >= 8:
+            range = 8
+            bmxconst = BMX160_ACCEL_RANGE_8G
+        elif range >= 4:
+            range = 4
+            bmxconst = BMX160_ACCEL_RANGE_4G
+        else:
+            range = 2
+            bmxconst = BMX160_ACCEL_RANGE_2G
+
+        self.write_u8(BMX160_ACCEL_RANGE_ADDR, bmxconst)
+        if self.query_error() == BMX160_OK:
+            self._accel_range = range
 
     def init_mag(self):
         # see pg 25 of: https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMX160-DS000.pdf
@@ -362,6 +390,7 @@ class BMX160:
         x *= range / 32768.0
         y *= range / 32768.0
         z *= range / 32768.0
+        # NOTE: This may be the wrong conversion! It might need to be something like (x + typemin(Int16)) / typemin(Int16)
 
         return (x, y, z)
 
