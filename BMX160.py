@@ -185,6 +185,22 @@ class BMX160:
     _BUFFER = bytearray(40)
     _smallbuf = bytearray(6)
 
+    _gyro_bandwidth = NORMAL
+    _gyro_powermode = NORMAL
+    _gyro_odr = 25    # Hz
+    _gyro_range = 250 # deg/sec
+
+    _accel_bandwidth = NORMAL
+    _accel_powermode = NORMAL
+    _accel_odr = 25  # Hz
+    _accel_range = 2 # g
+
+    _mag_bandwidth = NORMAL
+    _mag_powermode = NORMAL
+    _mag_odr = 25    # Hz
+    _mag_range = 250 # deg/sec
+
+
     def __init__(self):
         # soft reset & reboot
         self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_SOFT_RESET_CMD)
@@ -208,19 +224,22 @@ class BMX160:
 
     ### ACTUAL API
     @property
-    def gyro(self):  return decode_sensor(self.gyro_raw())
+    def gyro(self):  return decode_sensor(self.gyro_raw(), self._gyro_range)
 
     @property
-    def accel(self): return decode_sensor(self.accel_raw())
+    def accel(self): return decode_sensor(self.accel_raw(), self._accel_range)
 
     @property
-    def mag(self):   return decode_sensor(self.mag_raw())
+    def mag(self):   return decode_sensor(self.mag_raw(), self._mag_range)
 
     @property
     def sensortime(self):
         tbuf = self.sensortime_raw()
         t0, t1, t2 = tbuf[:3]
-        return (t2 << 16) | (t1 << 8) | t0
+        t = (t2 << 16) | (t1 << 8) | t0
+        t *= 0.000039 # the time resolution is 39 microseconds
+        return t
+
 
     # NOTE, these share a buffer! Can't call two in a row! Either make a wrapper for a buffer slice
     # to allow partial passing or copy the buffer to return or completely hide this API
@@ -232,38 +251,7 @@ class BMX160:
     ######################## SETTINGS RELATED ########################
     def clear_settings(self): self.settings.clear()
 
-    def set_sensor_param(self, sensor, param, value):
-        """
-        Set any sensor configuration parameter. `sensor` and `param` should be strings
-        like ("mag", "gyro", "accel"), and ("range", "config"). Case doesn't matter for these strings.
-        """
-        assert sensor.lower() in ("mag", "gyro", "accel")
 
-        if param.lower() == "range":
-            registername = "BMX160_" + sensor.upper() + "_RANGE_ADDR"
-        else:
-            registername = "BMX160_COMMAND_REG_ADDR"
-
-        if registername in globals():
-            register = globals()[registername]
-            self.write_u8(register, value)
-        else:
-            print("WARNING: no register found corresponding to {}".format(registername))
-
-    def apply_sensor_params(self, settings = None):
-        if settings == None:
-            settings = self.settings
-
-        params = self.default_settings()
-        params.update(settings)
-
-        for key, val in params["accel"].items():
-            self.set_sensor_param("accel", key, val)
-
-        for key, val in params["gyro"].items():
-            self.set_sensor_param("gyro", key, val)
-
-        # for key, val in params["mag"]:
             # self.set_sensor_param("mag", key, val)
 
     def default_settings(self):
@@ -317,6 +305,19 @@ class BMX160:
         self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_MAG_LOWPOWER_MODE)
         time.sleep(0.1) # takes this long to warm up (empirically)
 
+
+    ## UTILS:
+    def decode_sensor(arr, range):
+        x = (arr[1] << 8) | arr[0]
+        y = (arr[3] << 8) | arr[2]
+        z = (arr[5] << 8) | arr[4]
+
+        # divide by typemax(Int16) and multiply by range
+        x *= range / 32768.0
+        y *= range / 32768.0
+        z *= range / 32768.0
+
+        return (x, y, z)
 
 
 
@@ -377,12 +378,3 @@ class BMX160_SPI(BMX160):
             self._BUFFER[1] = val & 0xFF
             spi.write(self._BUFFER, end=2)
 
-## UTILS:
-
-def bytestoint(lsb, msb): return (msb << 8) | lsb
-
-def decode_sensor(arr):
-    x = bytestoint(arr[0], arr[1])
-    y = bytestoint(arr[2], arr[3])
-    z = bytestoint(arr[4], arr[5])
-    return (x, y, z)
