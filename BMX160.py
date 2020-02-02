@@ -103,6 +103,13 @@ BMX160_ACCEL_RANGE_4G                = const(0x05)
 BMX160_ACCEL_RANGE_8G                = const(0x08)
 BMX160_ACCEL_RANGE_16G               = const(0x0C)
 
+BMX160_ACCEL_RANGE_CONSTANTS = [BMX160_ACCEL_RANGE_16G,
+                                BMX160_ACCEL_RANGE_8G,
+                                BMX160_ACCEL_RANGE_4G,
+                                BMX160_ACCEL_RANGE_2G]
+BMX160_ACCEL_RANGE_VALUES = [16, 8, 4, 2]
+
+
 # Gyro Range
 BMX160_GYRO_RANGE_2000_DPS           = const(0x00)
 BMX160_GYRO_RANGE_1000_DPS           = const(0x01)
@@ -110,6 +117,12 @@ BMX160_GYRO_RANGE_500_DPS            = const(0x02)
 BMX160_GYRO_RANGE_250_DPS            = const(0x03)
 BMX160_GYRO_RANGE_125_DPS            = const(0x04)
 
+BMX160_GYRO_RANGE_CONSTANTS = [BMX160_GYRO_RANGE_2000_DPS,
+                               BMX160_GYRO_RANGE_1000_DPS,
+                               BMX160_GYRO_RANGE_500_DPS,
+                               BMX160_GYRO_RANGE_250_DPS,
+                               BMX160_GYRO_RANGE_125_DPS]
+BMX160_GYRO_RANGE_VALUES = [2000, 1000, 500, 250, 125]
 
 # Delay in ms settings
 BMX160_ACCEL_DELAY_MS                = const(5)
@@ -149,6 +162,14 @@ BMX160_GYRO_ODR_800HZ                = const(0x0B)
 BMX160_GYRO_ODR_1600HZ               = const(0x0C)
 BMX160_GYRO_ODR_3200HZ               = const(0x0D)
 
+BMX160_GYRO_ODR_CONSTANTS = [BMX160_GYRO_ODR_3200HZ,
+                             BMX160_GYRO_ODR_1600HZ,
+                             BMX160_GYRO_ODR_800HZ,
+                             BMX160_GYRO_ODR_400HZ,
+                             BMX160_GYRO_ODR_200HZ,
+                             BMX160_GYRO_ODR_100HZ,
+                             BMX160_GYRO_ODR_50HZ]
+BMX160_GYRO_ODR_VALUES = [3200, 1600, 800, 400, 200, 100, 50]
 
 # Auxiliary sensor Output data rate
 BMX160_MAG_ODR_RESERVED              = const(0x00)
@@ -306,25 +327,13 @@ class BMX160:
         2000, 1000, 500, 250, and 125 degree/second. Note, setting a value between the possible ranges
         will round *downwards*. A value of e.g. 250 means the sensor can measure +/-250 deg/sec
         """
-        if range >= 2000:
-            range = 2000
-            bmxconst = BMX160_GYRO_RANGE_2000_DPS
-        elif range >= 1000:
-            range = 1000
-            bmxconst = BMX160_GYRO_RANGE_1000_DPS
-        elif range >= 500:
-            range = 500
-            bmxconst = BMX160_GYRO_RANGE_500_DPS
-        elif range >= 250:
-            range = 250
-            bmxconst = BMX160_GYRO_RANGE_250_DPS
-        else:
-            range = 125
-            bmxconst = BMX160_GYRO_RANGE_125_DPS
-
+        range, bmxconst = self.find_nearest_valid(range, BMX160_GYRO_RANGE_VALUES, BMX160_GYRO_RANGE_CONSTANTS)
         self.write_u8(BMX160_GYRO_RANGE_ADDR, bmxconst)
         if self.query_error() == BMX160_OK:
             self._gyro_range = range
+        else:
+            warn(self.error_changing_setting_warning("gyroscope range"))
+
 
     @property
     def accel_range(self):
@@ -334,25 +343,28 @@ class BMX160:
     def accel_range(self, range):
         """
         Set the range of the accelerometer. The possible ranges are 16, 8, 4, and 2 Gs.
-        Note, setting a value between the possible ranges will round *downwards*.
+        Note, setting a value between the possible ranges will round *downwards* unless it is below 2.
         A value of e.g. 2 means the sensor can measure +/-2 G
         """
-        if range >= 16:
-            range = 16
-            bmxconst = BMX160_ACCEL_RANGE_16G
-        elif range >= 8:
-            range = 8
-            bmxconst = BMX160_ACCEL_RANGE_8G
-        elif range >= 4:
-            range = 4
-            bmxconst = BMX160_ACCEL_RANGE_4G
-        else:
-            range = 2
-            bmxconst = BMX160_ACCEL_RANGE_2G
-
+        range, bmxconst = self.find_nearest_valid(range, BMX160_ACCEL_RANGE_VALUES, BMX160_ACCEL_RANGE_CONSTANTS)
         self.write_u8(BMX160_ACCEL_RANGE_ADDR, bmxconst)
         if self.query_error() == BMX160_OK:
             self._accel_range = range
+        else:
+            warn(self.error_changing_setting_warning("accelerometer range"))
+
+    @property
+    def gyro_odr(self):
+        return self._gyro_odr
+
+    @gyro_odr.setter
+    def gyro_odr(self, odr):
+        range, bmxconst = self.find_nearest_valid(range, BMX160_GYRO_ODR_VALUES, BMX160_GYRO_ODR_CONSTANTS)
+        self.write_u8(BMX160_GYRO_CONFIG_ADDR, bmxconst)
+        if self.query_error() == BMX160_OK:
+            self._gyro_odr = range
+        else:
+            warn(self.error_changing_setting_warning("gyroscope odr"))
 
     def init_mag(self):
         # see pg 25 of: https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMX160-DS000.pdf
@@ -394,6 +406,23 @@ class BMX160:
 
         return (x, y, z)
 
+    def findfirstlessthan(des, seq): return next(filter(lambda x: (des > x[1]), enumerate(seq)), None)
+
+    def find_nearest_valid(self, desired, possible_values, bmx_values):
+        res = findfirstlessthan(desired, possible_values)
+        if res == None:
+            val = possible_values[-1]
+            bmxconst = bmx_values[-1]
+        else:
+            val = possible_values[res[0]]
+            bmxconst = bmx_values[res[0]]
+
+        return val, bmxconst
+
+    def error_changing_setting_warning(self, interp = ""):
+        if interp != "":
+            interp += " "
+        return "BMX160 error occurred during " + interp + "setting change. Setting not successfully changed and BMX160 may be in error state."
 
 
 class BMX160_I2C(BMX160):
