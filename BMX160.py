@@ -13,7 +13,7 @@ BMX160_CHIP_ID = const(0xD8)
 
 # Soft reset command
 BMX160_SOFT_RESET_CMD      = const(0xb6)
-BMX160_SOFT_RESET_DELAY    = const(0.001)
+BMX160_SOFT_RESET_DELAY    = 0.001
 
 # Command
 BMX160_COMMAND_REG_ADDR    = const(0x7E)
@@ -87,10 +87,18 @@ BMX160_ACCEL_NORMAL_MODE             = const(0x11)
 BMX160_ACCEL_LOWPOWER_MODE           = const(0x12)
 BMX160_ACCEL_SUSPEND_MODE            = const(0x10)
 
+BMX160_ACCEL_MODES = [BMX160_ACCEL_NORMAL_MODE,
+                      BMX160_ACCEL_LOWPOWER_MODE,
+                      BMX160_ACCEL_SUSPEND_MODE]
+
 # Gyro power mode
 BMX160_GYRO_SUSPEND_MODE             = const(0x14)
 BMX160_GYRO_NORMAL_MODE              = const(0x15)
 BMX160_GYRO_FASTSTARTUP_MODE         = const(0x17)
+
+BMX160_GYRO_MODES = [BMX160_GYRO_SUSPEND_MODE,
+                     BMX160_GYRO_NORMAL_MODE,
+                     BMX160_GYRO_FASTSTARTUP_MODE]
 
 # Mag power mode
 BMX160_MAG_SUSPEND_MODE              = const(0x18)
@@ -125,12 +133,12 @@ BMX160_GYRO_RANGE_CONSTANTS = [BMX160_GYRO_RANGE_2000_DPS,
 BMX160_GYRO_RANGE_VALUES = [2000, 1000, 500, 250, 125]
 
 # Delay in ms settings
-BMX160_ACCEL_DELAY                   = const(0.005)
-BMX160_GYRO_DELAY                    = const(0.0081)
-BMX160_ONE_MS_DELAY                  = const(0.001)
-BMX160_MAG_COM_DELAY                 = const(0.001)
-BMX160_GYRO_SELF_TEST_DELAY          = const(0.002)
-BMX160_ACCEL_SELF_TEST_DELAY         = const(0.005)
+BMX160_ACCEL_DELAY                   = 0.005
+BMX160_GYRO_DELAY                    = 0.0081
+BMX160_ONE_MS_DELAY                  = 0.001
+BMX160_MAG_COM_DELAY                 = 0.001
+BMX160_GYRO_SELF_TEST_DELAY          = 0.002
+BMX160_ACCEL_SELF_TEST_DELAY         = 0.005
 
 # Output Data Rate settings
 # Accel Output data rate
@@ -235,20 +243,20 @@ class BMX160:
     _BUFFER = bytearray(40)
     _smallbuf = bytearray(6)
 
-    _gyro_bandwidth = NORMAL
-    _gyro_powermode = NORMAL
-    _gyro_odr = 25    # Hz
-    _gyro_range = 250 # deg/sec
+    # _gyro_bandwidth = NORMAL
+    # _gyro_powermode = NORMAL
+    # _gyro_odr = 25    # Hz
+    # _gyro_range = 250 # deg/sec
 
-    _accel_bandwidth = NORMAL
-    _accel_powermode = NORMAL
-    _accel_odr = 25  # Hz
-    _accel_range = 2 # g
+    # _accel_bandwidth = NORMAL
+    # _accel_powermode = NORMAL
+    # _accel_odr = 25  # Hz
+    # _accel_range = 2 # g
 
-    _mag_bandwidth = NORMAL
-    _mag_powermode = NORMAL
-    _mag_odr = 25    # Hz
-    _mag_range = 250 # deg/sec
+    # _mag_bandwidth = NORMAL
+    # _mag_powermode = NORMAL
+    # _mag_odr = 25    # Hz
+    # _mag_range = 250 # deg/sec
 
 
     def __init__(self):
@@ -262,9 +270,8 @@ class BMX160:
 
         # set the default settings
         self.init_gyro()
-        self.init_accel()
+        # self.init_accel()
         self.init_mag()
-        self.apply_sensor_params()
 
 
     ######################## SENSOR API ########################
@@ -307,8 +314,8 @@ class BMX160:
     def init_gyro(self):
         # BW doesn't have an interface yet
         self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_BW_NORMAL_MODE)
-        # the rest do
         self._gyro_bwmode = BMX160_GYRO_BW_NORMAL_MODE
+        # These rely on the setters to do their magic.
         self.gyro_range = 500
         self.gyro_odr = 25
         self.gyro_powermode = BMX160_GYRO_NORMAL_MODE
@@ -363,7 +370,7 @@ class BMX160:
         `BMX160_GYRO_FASTSTARTUP_MODE`
         """
         if powermode not in BMX160_GYRO_MODES:
-            warn("Unknown gyroscope powermode: " + str(powermode))
+            print("Unknown gyroscope powermode: " + str(powermode))
             return
 
         self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
@@ -382,8 +389,8 @@ class BMX160:
     def init_accel(self):
         # BW doesn't have an interface yet
         self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_BW_NORMAL_AVG4)
-        # the rest do
         self._accel_bwmode = BMX160_ACCEL_BW_NORMAL_AVG4
+        # These rely on the setters to do their magic.
         self.accel_range = 2
         self.accel_odr = 25
         self.accel_powermode = BMX160_ACCEL_NORMAL_MODE
@@ -394,7 +401,7 @@ class BMX160:
 
     @accel_range.setter
     def accel_range(self, range):
-         """
+        """
         Set the range of the accelerometer. The possible ranges are 16, 8, 4, and 2 Gs.
         Note, setting a value between the possible ranges will round *downwards* unless it is below 2.
         A value of e.g. 2 means the sensor can measure +/-2 G
@@ -433,7 +440,7 @@ class BMX160:
         `BMI160_ACCEL_SUSPEND_MODE`
         """
         if powermode not in BMX160_ACCEL_MODES:
-            warn("Unknown accelerometer powermode: " + str(powermode))
+            print("Unknown accelerometer powermode: " + str(powermode))
             return
 
         self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
@@ -475,45 +482,17 @@ class BMX160:
 
 
     ## UTILS:
-    def decode_sensor(arr, range):
-        x = (arr[1] << 8) | arr[0]
-        y = (arr[3] << 8) | arr[2]
-        z = (arr[5] << 8) | arr[4]
-
-        # divide by typemax(Int16) and multiply by range
-        x *= range / 32768.0
-        y *= range / 32768.0
-        z *= range / 32768.0
-        # NOTE: This may be the wrong conversion! It might need to be something like (x + typemin(Int16)) / typemin(Int16)
-
-        return (x, y, z)
-
-    def find_nearest_valid(self, desired, possible_values, bmx_values):
-        # This line finds the first value less than or equal to the desired value (and its index).
-        # res = None if the desired value is smaller than all elements of the list.
-        res = next(filter(lambda x: (desired >= x[1]), enumerate(possible_values)), None)
-        if res == None:
-            val = possible_values[-1]
-            bmxconst = bmx_values[-1]
-        else:
-            val = possible_values[res[0]]
-            bmxconst = bmx_values[res[0]]
-
-        return val, bmxconst
-
     def generic_setter(self, desired, possible_values, bmx_constants, config_addr, warning_interp = ""):
-        rounded, bmxconst = self.find_nearest_valid(desired, possible_values, bmx_constants)
+        i = find_nearest_valid(desired, possible_values)
+        rounded = possible_values[i]
+        bmxconst = bmx_constants[i]
         self.write_u8(config_addr, bmxconst)
-        if self.query_error() == BMX160_OK:
+        e = self.query_error()
+        print(e)
+        if e == BMX160_OK:
             return rounded
         else:
             settingswarning(warning_interp)
-
-    def settingswarning("interp"):
-        if interp == "":
-                interp += " "
-        warn("BMX160 error occurred during " + interp +
-             "setting change. Setting not successfully changed and BMX160 may be in error state.")
 
 
 class BMX160_I2C(BMX160):
@@ -573,3 +552,35 @@ class BMX160_SPI(BMX160):
             self._BUFFER[1] = val & 0xFF
             spi.write(self._BUFFER, end=2)
 
+
+# GENERIC UTILS:
+
+def find_nearest_valid(desired, possible_values):
+    # NOTE: assumes `possible_values` is sorted
+
+    # This line finds the first value less than or equal to the desired value and returns its index.
+    # If no such value exists (desired is lower than all possible), the line throws a StopIteration
+    # Exception. In that case we return -1 as the index to use (i.e. the smallest value)
+    try:
+        return next(filter(lambda x: (desired >= x[1]), enumerate(possible_values)))[0]
+    except:
+        return -1
+
+def settingswarning(interp = ""):
+    if interp != "":
+            interp += " "
+    print("BMX160 error occurred during " + interp +
+         "setting change. \nSetting not successfully changed and BMX160 may be in error state.")
+
+def decode_sensor(arr, range):
+    x = (arr[1] << 8) | arr[0]
+    y = (arr[3] << 8) | arr[2]
+    z = (arr[5] << 8) | arr[4]
+
+    # divide by typemax(Int16) and multiply by range
+    # x *= range / 32768.0
+    # y *= range / 32768.0
+    # z *= range / 32768.0
+    # NOTE: This may be the wrong conversion! It might need to be something like (x + typemin(Int16)) / typemin(Int16)
+
+    return (x, y, z)
