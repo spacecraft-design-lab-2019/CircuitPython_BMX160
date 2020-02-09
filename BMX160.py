@@ -173,7 +173,7 @@ BMX160_SPI_RD_MASK         = const(0x80)
 BMX160_SPI_WR_MASK         = const(0x7F)
 S2G=const(16384) # accelerometer sensitivity. See Section 1.2, Table 2
 
-class _ScaledReadOnlyStruct(Struct): # pylint: disable=too-few-public-methods
+class _ScaledReadOnlyStruct(Struct):
     def __init__(self, register_address, struct_format, scale):
         super(_ScaledReadOnlyStruct, self).__init__(
             register_address, struct_format)
