@@ -7,6 +7,9 @@ except ImportError:
 from adafruit_bus_device.i2c_device import I2CDevice
 from adafruit_bus_device.spi_device import SPIDevice
 from micropython import const
+from adafruit_register.i2c_struct import Struct, UnaryStruct
+from adafruit_register.i2c_bits import ROBits, RWBits
+from adafruit_register.i2c_bit import ROBit, RWBit
 
 # Chip ID
 BMX160_CHIP_ID = const(0xD8)
@@ -28,6 +31,7 @@ BMX160_GYRO_DATA_ADDR      = const(0x0C)
 BMX160_ACCEL_DATA_ADDR     = const(0x12)
 BMX160_STATUS_ADDR         = const(0x1B)
 BMX160_INT_STATUS_ADDR     = const(0x1C)
+BMX160_TEMP_DATA_ADDR      = const(0x20)
 BMX160_FIFO_LENGTH_ADDR    = const(0x22)
 BMX160_FIFO_DATA_ADDR      = const(0x24)
 BMX160_ACCEL_CONFIG_ADDR   = const(0x40)
@@ -228,6 +232,22 @@ BMX160_SPI_WR_MASK         = const(0x7F)
 # Error related
 BMX160_OK                  = const(0)
 
+S2G=const(16384) # accelerometer sensitivity. See Section 1.2, Table 2
+
+class _ScaledReadOnlyStruct(Struct):
+    def __init__(self, register_address, struct_format, scale):
+        super(_ScaledReadOnlyStruct, self).__init__(
+            register_address, struct_format)
+        self.scale = scale
+
+    def __get__(self, obj, objtype=None):
+        result = super(_ScaledReadOnlyStruct, self).__get__(obj, objtype)
+        return tuple(self.scale * v for v in result)
+
+    def __set__(self, obj, value):
+        raise NotImplementedError()
+
+
 class BMX160:
     """
     Driver for the BMX160 accelerometer, magnetometer, gyroscope.
@@ -239,6 +259,19 @@ class BMX160:
         - accel 14-19
         - sensor time 20-22
     """
+    SCALAR = S2G*0.101971621 # 1 m/s^2 = 0.101971621 g
+    _acceleration = _ScaledReadOnlyStruct(BMX160_ACCEL_DATA_ADDR, '<hhh', 1/SCALAR)
+    # _magnetic = _ScaledReadOnlyStruct(0x0e, '<hhh', NEED-SCALAR)
+    # _gyro = _ScaledReadOnlyStruct(0x14, '<hhh', NEED-SCALAR)
+    _temperature = _ScaledReadOnlyStruct(BMX160_TEMP_DATA_ADDR, '<h', 0.5**9)
+
+
+    status         = ROBits(8,BMX160_STATUS_ADDR,0)
+    status_acc_pmu = ROBits(2,BMX160_PMU_STATUS_ADDR,4)
+    status_gyr_pmu = ROBits(2,BMX160_PMU_STATUS_ADDR,2)
+    status_mag_pmu = ROBits(2,BMX160_PMU_STATUS_ADDR,0)
+    cmd = RWBits(8,BMX160_COMMAND_REG_ADDR,0)
+    foc = RWBits(8,BMX160_FOC_CONF_ADDR,0)
 
     _BUFFER = bytearray(40)
     _smallbuf = bytearray(6)
@@ -292,6 +325,14 @@ class BMX160:
 
     @property
     def mag(self):   return decode_sensor(self.mag_raw(), self._mag_range)
+
+    @property # max's testing
+    def acceleration(self):
+        return self._acceleration
+
+    @property # max's testing
+    def temperature(self):
+        return self._temperature[0]+23
 
     @property
     def sensortime(self):
