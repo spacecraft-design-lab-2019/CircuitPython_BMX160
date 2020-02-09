@@ -245,18 +245,18 @@ class BMX160:
 
     # _gyro_bandwidth = NORMAL
     # _gyro_powermode = NORMAL
-    # _gyro_odr = 25    # Hz
-    # _gyro_range = 250 # deg/sec
+    _gyro_odr = 25    # Hz
+    _gyro_range = 250 # deg/sec
 
     # _accel_bandwidth = NORMAL
     # _accel_powermode = NORMAL
-    # _accel_odr = 25  # Hz
-    # _accel_range = 2 # g
+    _accel_odr = 25  # Hz
+    _accel_range = 2 # g
 
     # _mag_bandwidth = NORMAL
     # _mag_powermode = NORMAL
-    # _mag_odr = 25    # Hz
-    # _mag_range = 250 # deg/sec
+    _mag_odr = 25    # Hz
+    _mag_range = 250 # deg/sec
 
 
     def __init__(self):
@@ -268,11 +268,14 @@ class BMX160:
         if ID != BMX160_CHIP_ID:
             raise RuntimeError('Could not find BMX160, check wiring!')
 
+        print(self.status())
         # set the default settings
-        self.init_gyro()
-        # self.init_accel()
         self.init_mag()
+        self.init_accel()
+        self.init_gyro()
 
+
+        print(self.status())
 
     ######################## SENSOR API ########################
 
@@ -305,6 +308,21 @@ class BMX160:
     def accel_raw(self): return self.read_bytes(BMX160_ACCEL_DATA_ADDR, 6, self._smallbuf)
     def mag_raw(self):   return self.read_bytes(BMX160_MAG_DATA_ADDR, 6, self._smallbuf)
     def sensortime_raw(self):  return self.read_bytes(BMX160_SENSOR_TIME_ADDR, 3, self._smallbuf)
+
+    def status_byte(self): return self.read_u8(BMX160_STATUS_ADDR)
+
+    def status(self):
+        b = self.status_byte()
+        return '{:0>8}'.format(bin(b)[2:]) # convert to binary string
+
+    def drdy_acc(self): return int(self.status()[0])
+    def drdy_gyr(self): return int(self.status()[1])
+    def drdy_mag(self): return int(self.status()[2])
+    def nvm_rdy(self): return int(self.status()[3])
+    def foc_rdy(self): return int(self.status()[4])
+    def mag_man_op(self): return int(self.status()[5])
+    def gyro_self_test_ok(self): return int(self.status()[6])
+
 
     ######################## SETTINGS RELATED ########################
 
@@ -440,7 +458,7 @@ class BMX160:
         `BMI160_ACCEL_SUSPEND_MODE`
         """
         if powermode not in BMX160_ACCEL_MODES:
-            print("Unknown accelerometer powermode: " + str(powermode))
+            print("Unknown accelerometer power mode: " + str(powermode))
             return
 
         self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
@@ -488,7 +506,6 @@ class BMX160:
         bmxconst = bmx_constants[i]
         self.write_u8(config_addr, bmxconst)
         e = self.query_error()
-        print(e)
         if e == BMX160_OK:
             return rounded
         else:
@@ -556,7 +573,7 @@ class BMX160_SPI(BMX160):
 # GENERIC UTILS:
 
 def find_nearest_valid(desired, possible_values):
-    # NOTE: assumes `possible_values` is sorted
+    # NOTE: assumes `possible_values` is sorted in decreasing order
 
     # This line finds the first value less than or equal to the desired value and returns its index.
     # If no such value exists (desired is lower than all possible), the line throws a StopIteration
