@@ -275,8 +275,8 @@ class BMX160:
     # multiplicative constants
     ACC_SCALAR = 1/(AccelSensitivity2Gravity * g_TO_METERS_PER_SECOND_SQUARED) # 1 m/s^2 = 0.101971621 g
     GYR_SCALAR = 1/GyroSensitivity2DegPerSec
-    MAG_SCALAR = 0.3 # TODO from the datasheet somewhere
-    # MAG_SCALAR = 16 # TODO also from the datasheet somewhere. Given in LSB/
+    # MAG_SCALAR = 1/0.3 # TODO from the datasheet somewhere
+    MAG_SCALAR = 1/16 # TODO also from the datasheet somewhere. Given in LSB/
     TEMP_SCALAR = 0.5**9
 
     # NEED_SCALAR = 1 # placeholder
@@ -301,6 +301,7 @@ class BMX160:
     drop_cmd_err  = ROBit(BMX160_ERROR_REG_ADDR, 6)
     fatal_err     = ROBit(BMX160_ERROR_REG_ADDR, 0)
 
+    # straight from the datasheet. Need to be renamed and better explained
     @property
     def drdy_acc(self): return (self.status >> 7) & 1
     @property
@@ -315,16 +316,6 @@ class BMX160:
     def mag_man_op(self): return (self.status >> 2) & 1
     @property
     def gyro_self_test_ok(self): return (self.status >> 1)  & 1
-    # straight from the datasheet. Need to be renamed and better explained
-    # also takes a byte each, so should be implemented with a shared buffer
-    # drdy_acc          = ROBit(BMX160_STATUS_ADDR, 6)
-    # drdy_gyr          = ROBit(BMX160_STATUS_ADDR, 5)
-    # drdy_mag          = ROBit(BMX160_STATUS_ADDR, 4)
-    # nvm_rdy           = ROBit(BMX160_STATUS_ADDR, 3)
-    # foc_rdy           = ROBit(BMX160_STATUS_ADDR, 2)
-    # mag_man_op        = ROBit(BMX160_STATUS_ADDR, 1)
-    # gyro_self_test_ok = ROBit(BMX160_STATUS_ADDR, 0)
-
 
     _BUFFER = bytearray(40)
     _smallbuf = bytearray(6)
