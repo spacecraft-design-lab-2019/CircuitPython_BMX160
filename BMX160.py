@@ -236,6 +236,8 @@ BMX160_OK                  = const(0)
 AccelSensitivity2Gravity_values = [16384//(2**i) for i in range(4)]   # accelerometer sensitivity. See Section 1.2, Table 2
 GyroSensitivity2DegPerSec_values = [16.4 * (2**i) for i in range(5)]  # Section 1.2, Table 3
 
+g_TO_METERS_PER_SECOND_SQUARED = 1/9.80665 # in m/s^2
+
 AccelSensitivity2Gravity = const(16384)  # accelerometer sensitivity. See Section 1.2, Table 2
 GyroSensitivity2DegPerSec = 131.2        # gyroscope sensitivity. See Section 1.2, Table 3
 
@@ -269,17 +271,20 @@ class BMX160:
         - accel 14-19
         - sensor time 20-22
     """
-    ACC_SCALAR = AccelSensitivity2Gravity*0.101971621 # 1 m/s^2 = 0.101971621 g
-    GYR_SCALAR = GyroSensitivity2DegPerSec
+
+    # multiplicative constants
+    ACC_SCALAR = 1/(AccelSensitivity2Gravity * g_TO_METERS_PER_SECOND_SQUARED) # 1 m/s^2 = 0.101971621 g
+    GYR_SCALAR = 1/GyroSensitivity2DegPerSec
     MAG_SCALAR = 0.3 # TODO from the datasheet somewhere
     # MAG_SCALAR = 16 # TODO also from the datasheet somewhere. Given in LSB/
+    TEMP_SCALAR = 0.5**9
 
     # NEED_SCALAR = 1 # placeholder
 
-    _accel = _ScaledReadOnlyStruct(BMX160_ACCEL_DATA_ADDR, '<hhh', 1/ACC_SCALAR) # this is the default scalar, but it should get reset anyhow in init
-    _gyro  = _ScaledReadOnlyStruct(BMX160_GYRO_DATA_ADDR, '<hhh', 1/GYR_SCALAR)
-    _mag   = _ScaledReadOnlyStruct(BMX160_MAG_DATA_ADDR, '<hhh', MAG_SCALAR)
-    _temp  = _ScaledReadOnlyStruct(BMX160_TEMP_DATA_ADDR, '<h', 0.5**9)
+    _accel = Struct(BMX160_ACCEL_DATA_ADDR, '<hhh') # this is the default scalar, but it should get reset anyhow in init
+    _gyro  = Struct(BMX160_GYRO_DATA_ADDR, '<hhh')
+    _mag   = Struct(BMX160_MAG_DATA_ADDR, '<hhh')
+    _temp  = Struct(BMX160_TEMP_DATA_ADDR, '<h')
 
 
     ### STATUS BITS
@@ -291,25 +296,25 @@ class BMX160:
     foc = RWBits(8, BMX160_FOC_CONF_ADDR, 0)
 
     # see ERR_REG in section 2.11.2
-    _error_status = ROBits(8, BMX160_ERROR_REG_ADDR)
+    _error_status = ROBits(8, BMX160_ERROR_REG_ADDR, 0)
     error_code    = ROBits(4, BMX160_ERROR_REG_ADDR, 1)
     drop_cmd_err  = ROBit(BMX160_ERROR_REG_ADDR, 6)
     fatal_err     = ROBit(BMX160_ERROR_REG_ADDR, 0)
 
     @property
-    def drdy_acc(self): (self.status >> 6) & 1
+    def drdy_acc(self): return (self.status >> 7) & 1
     @property
-    def drdy_gyr(self): (self.status >> 5) & 1
+    def drdy_gyr(self): return (self.status >> 6) & 1
     @property
-    def drdy_mag(self): (self.status >> 4) & 1
+    def drdy_mag(self): return (self.status >> 5) & 1
     @property
-    def nvm_rdy(self): (self.status >> 3) & 1
+    def nvm_rdy(self): return (self.status >> 4) & 1
     @property
-    def foc_rdy(self): (self.status >> 2) & 1
+    def foc_rdy(self): return (self.status >> 3) & 1
     @property
-    def mag_man_op(self): (self.status >> 1) & 1
+    def mag_man_op(self): return (self.status >> 2) & 1
     @property
-    def gyro_self_test_ok(self): self.status  & 1
+    def gyro_self_test_ok(self): return (self.status >> 1)  & 1
     # straight from the datasheet. Need to be renamed and better explained
     # also takes a byte each, so should be implemented with a shared buffer
     # drdy_acc          = ROBit(BMX160_STATUS_ADDR, 6)
@@ -372,22 +377,22 @@ class BMX160:
     ### ACTUAL API
     @property
     def gyro(self):
-        return self._gyro
+        return tuple(x * self.GYR_SCALAR for x in self._gyro)
 
     @property
     def accel(self):
-        return self._accel
+        return tuple(x * self.ACC_SCALAR for x in self._accel)
 
     @property
     def mag(self):
-        return self._mag
+        return tuple(x * self.MAG_SCALAR for x in self._mag)
 
     @property
     def temperature(self):
-        return self._temp[0]+23
+        return self._temp[0]*TEMP_SCALAR + 23
     @property
     def temp(self):
-        return self._temp[0]+23
+        return self._temp[0]*TEMP_SCALAR + 23
 
     @property
     def sensortime(self):
@@ -465,7 +470,7 @@ class BMX160:
             return
 
         self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
-        if self.query_error == 0:
+        if int(self.query_error) == 0:
             self._gyro_powermode = powermode
         else:
             settingswarning("gyroscope power mode")
@@ -535,7 +540,7 @@ class BMX160:
             return
 
         self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
-        if self.query_error == 0:
+        if int(self.query_error) == 0:
             self._accel_powermode = powermode
         else:
             settingswarning("accelerometer power mode")
@@ -578,7 +583,7 @@ class BMX160:
         rounded = possible_values[i]
         bmxconst = bmx_constants[i]
         self.write_u8(config_addr, bmxconst)
-        e = self.query_error
+        e = (self.query_error)
         if e == BMX160_OK:
             return rounded
         else:
@@ -658,7 +663,7 @@ def find_nearest_valid(desired, possible_values):
 
 def settingswarning(interp = ""):
     if interp != "":
-            interp += " "
+            interp = " --"  + interp + " -- "
     print("BMX160 error occurred during " + interp +
          "setting change. \nSetting not successfully changed and BMX160 may be in error state.")
 
