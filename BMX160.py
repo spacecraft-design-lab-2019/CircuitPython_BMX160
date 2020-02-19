@@ -279,8 +279,6 @@ class BMX160:
     MAG_SCALAR = 1/16 # TODO also from the datasheet somewhere. Given in LSB/
     TEMP_SCALAR = 0.5**9
 
-    # NEED_SCALAR = 1 # placeholder
-
     _accel = Struct(BMX160_ACCEL_DATA_ADDR, '<hhh') # this is the default scalar, but it should get reset anyhow in init
     _gyro  = Struct(BMX160_GYRO_DATA_ADDR, '<hhh')
     _mag   = Struct(BMX160_MAG_DATA_ADDR, '<hhh')
@@ -338,7 +336,7 @@ class BMX160:
 
     def __init__(self):
         # soft reset & reboot
-        self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_SOFT_RESET_CMD)
+        self.cmd = BMX160_SOFT_RESET_CMD
         time.sleep(BMX160_SOFT_RESET_DELAY)
         # Check ID registers.
         ID = self.read_u8(BMX160_CHIP_ID_ADDR)
@@ -460,7 +458,7 @@ class BMX160:
             print("Unknown gyroscope powermode: " + str(powermode))
             return
 
-        self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
+        self.cmd = powermode
         if int(self.query_error) == 0:
             self._gyro_powermode = powermode
         else:
@@ -530,7 +528,7 @@ class BMX160:
             print("Unknown accelerometer power mode: " + str(powermode))
             return
 
-        self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
+        self.cmd = powermode
         if int(self.query_error) == 0:
             self._accel_powermode = powermode
         else:
@@ -544,7 +542,7 @@ class BMX160:
 
     def init_mag(self):
         # see pg 25 of: https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMX160-DS000.pdf
-        self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_MAG_NORMAL_MODE)
+        self.cmd = BMX160_MAG_NORMAL_MODE
         time.sleep(0.00065) # datasheet says wait for 650microsec
         self.write_u8(BMX160_MAG_IF_0_ADDR, 0x80)
         # put mag into sleep mode
