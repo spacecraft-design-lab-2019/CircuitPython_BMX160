@@ -1,5 +1,5 @@
 # CircuitPython_BMX160
-Circuit driver for BMX160
+CircuitPython driver for BMX160
 
 For reference, see the datasheet for the device [here](https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMX160-DS000.pdf)
 
