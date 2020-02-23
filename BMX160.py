@@ -400,7 +400,7 @@ class BMX160:
         # BW doesn't have an interface yet
         self._gyro_bwmode = BMX160_GYRO_BW_NORMAL_MODE
         # These rely on the setters to do their magic.
-        self.gyro_range = 1000
+        self.gyro_range = BMX160_GYRO_RANGE_500_DPS
         # self.GYR_SCALAR = 1
         # self.GYR_SCALAR = 1/GyroSensitivity2DegPerSec_values[1]
 
@@ -427,8 +427,21 @@ class BMX160:
 
         ex: bmx.gyro_range = BMX160_GYRO_RANGE_500_DPS
         """
-        self._gyro_range = rangeconst:
-        if self._error_status == 0
+
+        if rangeconst == BMX160_GYRO_RANGE_2000_DPS:
+            self._gyro_range = BMX160_GYRO_RANGE_2000_DPS
+        elif rangeconst == BMX160_GYRO_RANGE_1000_DPS:
+            self._gyro_range = BMX160_GYRO_RANGE_1000_DPS
+        elif rangeconst == BMX160_GYRO_RANGE_500_DPS:
+            self._gyro_range = BMX160_GYRO_RANGE_500_DPS
+        elif rangeconst == BMX160_GYRO_RANGE_250_DPS:
+            self._gyro_range = BMX160_GYRO_RANGE_250_DPS
+        elif rangeconst == BMX160_GYRO_RANGE_125_DPS:
+            self._gyro_range = BMX160_GYRO_RANGE_125_DPS
+        else:
+            return
+
+        if self._error_status == 0:
             self.GYR_SCALAR = 1 / GyroSensitivity2DegPerSec_values[rangeconst]
 
     @property
@@ -484,7 +497,7 @@ class BMX160:
         self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_BW_NORMAL_AVG4)
         self._accel_bwmode = BMX160_ACCEL_BW_NORMAL_AVG4
         # These rely on the setters to do their magic.
-        self.accel_range = 2
+        self.accel_range = BMX160_ACCEL_RANGE_2G
         self.accel_odr = 25
         self.accel_powermode = BMX160_ACCEL_NORMAL_MODE
 
@@ -505,7 +518,17 @@ class BMX160:
         16    |   12           | BMX160_ACCEL_RANGE_16G
         """
 
-        self._accel_range = rangeconst
+        if rangeconst == BMX160_ACCEL_RANGE_2G:
+            self._accel_range = BMX160_ACCEL_RANGE_2G
+        elif rangeconst == BMX160_ACCEL_RANGE_4G:
+            self._accel_range = BMX160_ACCEL_RANGE_4G
+        elif rangeconst == BMX160_ACCEL_RANGE_8G:
+            self._accel_range = BMX160_ACCEL_RANGE_8G
+        elif rangeconst == BMX160_ACCEL_RANGE_16G:
+            self._accel_range = BMX160_ACCEL_RANGE_16G
+        else:
+            return
+
         if self._error_status == 0:
             ind = rangeconst >> 2  # convert to 0-3 range
             self.ACC_SCALAR = 1 / (AccelSensitivity2Gravity_values[ind] * g_TO_METERS_PER_SECOND_SQUARED)
