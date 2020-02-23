@@ -428,16 +428,8 @@ class BMX160:
         ex: bmx.gyro_range = BMX160_GYRO_RANGE_500_DPS
         """
 
-        if rangeconst == BMX160_GYRO_RANGE_2000_DPS:
-            self._gyro_range = BMX160_GYRO_RANGE_2000_DPS
-        elif rangeconst == BMX160_GYRO_RANGE_1000_DPS:
-            self._gyro_range = BMX160_GYRO_RANGE_1000_DPS
-        elif rangeconst == BMX160_GYRO_RANGE_500_DPS:
-            self._gyro_range = BMX160_GYRO_RANGE_500_DPS
-        elif rangeconst == BMX160_GYRO_RANGE_250_DPS:
-            self._gyro_range = BMX160_GYRO_RANGE_250_DPS
-        elif rangeconst == BMX160_GYRO_RANGE_125_DPS:
-            self._gyro_range = BMX160_GYRO_RANGE_125_DPS
+        if rangeconst in BMX160_GYRO_RANGE_CONSTANTS:
+            self._gyro_range = rangeconst
         else:
             return
 
@@ -518,14 +510,8 @@ class BMX160:
         16    |   12           | BMX160_ACCEL_RANGE_16G
         """
 
-        if rangeconst == BMX160_ACCEL_RANGE_2G:
-            self._accel_range = BMX160_ACCEL_RANGE_2G
-        elif rangeconst == BMX160_ACCEL_RANGE_4G:
-            self._accel_range = BMX160_ACCEL_RANGE_4G
-        elif rangeconst == BMX160_ACCEL_RANGE_8G:
-            self._accel_range = BMX160_ACCEL_RANGE_8G
-        elif rangeconst == BMX160_ACCEL_RANGE_16G:
-            self._accel_range = BMX160_ACCEL_RANGE_16G
+        if rangeconst in BMX160_ACCEL_RANGE_CONSTANTS:
+            self._accel_range = rangeconst
         else:
             return
 
