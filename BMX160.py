@@ -233,8 +233,8 @@ BMX160_SPI_WR_MASK         = const(0x7F)
 BMX160_OK                  = const(0)
 
 # Each goes with a different sensitivity in decreasing order
-AccelSensitivity2Gravity_values = [16384//(2**i) for i in range(4)]   # accelerometer sensitivity. See Section 1.2, Table 2
-GyroSensitivity2DegPerSec_values = [16.4 * (2**i) for i in range(5)]  # Section 1.2, Table 3
+AccelSensitivity2Gravity_values = [2048, 4086, 8192, 16384]   # accelerometer sensitivity. See Section 1.2, Table 2
+GyroSensitivity2DegPerSec_values = [16.4, 32.8, 65.6, 131.2, 262.4]  # Section 1.2, Table 3
 
 g_TO_METERS_PER_SECOND_SQUARED = 1/9.80665 # in m/s^2
 
@@ -274,9 +274,8 @@ class BMX160:
 
     # multiplicative constants
     ACC_SCALAR = 1/(AccelSensitivity2Gravity * g_TO_METERS_PER_SECOND_SQUARED) # 1 m/s^2 = 0.101971621 g
-    GYR_SCALAR = 1/GyroSensitivity2DegPerSec
-    # MAG_SCALAR = 1/0.3 # TODO from the datasheet somewhere
-    MAG_SCALAR = 1/16 # TODO also from the datasheet somewhere. Given in LSB/
+    GYR_SCALAR = 1/GyroSensitivity2DegPerSec_values[4]
+    MAG_SCALAR = 1/16
     TEMP_SCALAR = 0.5**9
 
     _accel = Struct(BMX160_ACCEL_DATA_ADDR, '<hhh') # this is the default scalar, but it should get reset anyhow in init
@@ -318,15 +317,16 @@ class BMX160:
     _BUFFER = bytearray(40)
     _smallbuf = bytearray(6)
 
+    _gyro_range = RWBits(8, BMX160_GYRO_RANGE_ADDR, 0)
+    _accel_range = RWBits(8, BMX160_ACCEL_RANGE_ADDR, 0)
+
     # _gyro_bandwidth = NORMAL
     # _gyro_powermode = NORMAL
     _gyro_odr = 25    # Hz
-    _gyro_range = 250 # deg/sec
 
     # _accel_bandwidth = NORMAL
     # _accel_powermode = NORMAL
     _accel_odr = 25  # Hz
-    _accel_range = 2 # g
 
     # _mag_bandwidth = NORMAL
     # _mag_powermode = NORMAL
@@ -343,12 +343,12 @@ class BMX160:
         if ID != BMX160_CHIP_ID:
             raise RuntimeError('Could not find BMX160, check wiring!')
 
-        print(self.status)
+        # print("status:", format_binary(self.status))
         # set the default settings
         self.init_mag()
         self.init_accel()
         self.init_gyro()
-        print(self.status)
+        # print("status:", format_binary(self.status))
 
     ######################## SENSOR API ########################
 
@@ -378,10 +378,10 @@ class BMX160:
 
     @property
     def temperature(self):
-        return self._temp[0]*TEMP_SCALAR + 23
+        return self._temp[0]*self.TEMP_SCALAR+23
     @property
     def temp(self):
-        return self._temp[0]*TEMP_SCALAR + 23
+        return self._temp[0]*self.TEMP_SCALAR+23
 
     @property
     def sensortime(self):
@@ -398,10 +398,12 @@ class BMX160:
 
     def init_gyro(self):
         # BW doesn't have an interface yet
-        self.write_u8(BMX160_GYRO_CONFIG_ADDR, BMX160_GYRO_BW_NORMAL_MODE)
         self._gyro_bwmode = BMX160_GYRO_BW_NORMAL_MODE
         # These rely on the setters to do their magic.
-        self.gyro_range = 500
+        self.gyro_range = 1000
+        # self.GYR_SCALAR = 1
+        # self.GYR_SCALAR = 1/GyroSensitivity2DegPerSec_values[1]
+
         self.gyro_odr = 25
         self.gyro_powermode = BMX160_GYRO_NORMAL_MODE
 
@@ -410,18 +412,21 @@ class BMX160:
         return self._gyro_range
 
     @gyro_range.setter
-    def gyro_range(self, range):
+    def gyro_range(self, rangeconst):
         """
-        Set the range of the gyroscope. The possible ranges are
-        2000, 1000, 500, 250, and 125 degree/second. Note, setting a value between the possible ranges
-        will round *downwards*. A value of e.g. 250 means the sensor can measure +/-250 deg/sec
+        The input is expected to be the BMX160-constant associated with the range.
+
+        deg/s | bmxconst
+        ------------------
+        2000  |   0
+        1000  |   1
+        500   |   2
+        250   |   3
+        125   |   4
         """
-        res = self.generic_setter(range, BMX160_GYRO_RANGE_VALUES,
-                                  BMX160_GYRO_RANGE_CONSTANTS,
-                                  BMX160_GYRO_RANGE_ADDR,
-                                  "gyroscope range")
-        if res != None:
-            self._gyro_range = res
+        self._gyro_range = rangeconst:
+        if self._error_status == 0
+            self.GYR_SCALAR = 1 / GyroSensitivity2DegPerSec_values[rangeconst]
 
     @property
     def gyro_odr(self):
@@ -439,7 +444,7 @@ class BMX160:
                                   BMX160_GYRO_CONFIG_ADDR,
                                   "gyroscope odr")
         if res != None:
-            self._gyro_odr = res
+            self._gyro_odr = res[1]
 
     @property
     def gyro_powermode(self):
@@ -458,7 +463,7 @@ class BMX160:
             print("Unknown gyroscope powermode: " + str(powermode))
             return
 
-        self.cmd = powermode
+        self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
         if int(self.query_error) == 0:
             self._gyro_powermode = powermode
         else:
@@ -485,18 +490,21 @@ class BMX160:
         return self._accel_range
 
     @accel_range.setter
-    def accel_range(self, range):
+    def accel_range(self, rangeconst):
         """
-        Set the range of the accelerometer. The possible ranges are 16, 8, 4, and 2 Gs.
-        Note, setting a value between the possible ranges will round *downwards* unless it is below 2.
-        A value of e.g. 2 means the sensor can measure +/-2 G
+        The input is expected to be the BMX160-constant associated with the range.
+
+        deg/s | bmxconst
+        ------------------
+        2000  |   0
+        1000  |   1
+        500   |   2
+        250   |   3
+        125   |   4
         """
-        res = self.generic_setter(range, BMX160_ACCEL_RANGE_VALUES,
-                                  BMX160_ACCEL_RANGE_CONSTANTS,
-                                  BMX160_ACCEL_RANGE_ADDR,
-                                  "accelerometer range")
-        if res != None:
-            self._accel_range = res
+        self._accel_range = rangeconst
+        if self._error_status == 0:
+            self.ACC_SCALAR = 1 / (AccelSensitivity2Gravity_values[rangeconst] * * g_TO_METERS_PER_SECOND_SQUARED)
 
     @property
     def accel_odr(self):
@@ -509,7 +517,7 @@ class BMX160:
                                   BMX160_ACCEL_CONFIG_ADDR,
                                   "accelerometer odr")
         if res != None:
-            self._accel_odr = res
+            self._accel_odr = res[1]
 
     @property
     def accel_powermode(self):
@@ -528,7 +536,7 @@ class BMX160:
             print("Unknown accelerometer power mode: " + str(powermode))
             return
 
-        self.cmd = powermode
+        self.write_u8(BMX160_COMMAND_REG_ADDR, powermode)
         if int(self.query_error) == 0:
             self._accel_powermode = powermode
         else:
@@ -542,7 +550,7 @@ class BMX160:
 
     def init_mag(self):
         # see pg 25 of: https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMX160-DS000.pdf
-        self.cmd = BMX160_MAG_NORMAL_MODE
+        self.write_u8(BMX160_COMMAND_REG_ADDR, BMX160_MAG_NORMAL_MODE)
         time.sleep(0.00065) # datasheet says wait for 650microsec
         self.write_u8(BMX160_MAG_IF_0_ADDR, 0x80)
         # put mag into sleep mode
@@ -572,9 +580,10 @@ class BMX160:
         rounded = possible_values[i]
         bmxconst = bmx_constants[i]
         self.write_u8(config_addr, bmxconst)
-        e = (self.query_error)
+        e = self.error_code
+
         if e == BMX160_OK:
-            return rounded
+            return (i, rounded)
         else:
             settingswarning(warning_interp)
 
@@ -644,7 +653,7 @@ def find_nearest_valid(desired, possible_values):
 
     # This line finds the first value less than or equal to the desired value and returns its index.
     # If no such value exists (desired is lower than all possible), the line throws a StopIteration
-    # Exception. In that case we return -1 as the index to use (i.e. the smallest value)
+    # Exception. In that case we return -1 as the index to use (i.e. the last/smallest value in the list)
     try:
         return next(filter(lambda x: (desired >= x[1]), enumerate(possible_values)))[0]
     except:
