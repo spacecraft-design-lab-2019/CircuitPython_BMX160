@@ -416,13 +416,16 @@ class BMX160:
         """
         The input is expected to be the BMX160-constant associated with the range.
 
-        deg/s | bmxconst
-        ------------------
-        2000  |   0
-        1000  |   1
-        500   |   2
-        250   |   3
-        125   |   4
+        deg/s | bmxconst value | bmxconst_name
+        ------------------------------------------------------
+        2000  |   0            |  BMX160_GYRO_RANGE_2000_DPS
+        1000  |   1            |  BMX160_GYRO_RANGE_1000_DPS
+        500   |   2            |  BMX160_GYRO_RANGE_500_DPS
+        250   |   3            |  BMX160_GYRO_RANGE_250_DPS
+        125   |   4            |  BMX160_GYRO_RANGE_125_DPS
+
+
+        ex: bmx.gyro_range = BMX160_GYRO_RANGE_500_DPS
         """
         self._gyro_range = rangeconst:
         if self._error_status == 0
@@ -494,17 +497,18 @@ class BMX160:
         """
         The input is expected to be the BMX160-constant associated with the range.
 
-        deg/s | bmxconst
-        ------------------
-        2000  |   0
-        1000  |   1
-        500   |   2
-        250   |   3
-        125   |   4
+        deg/s | bmxconst value | bmxconst name
+        ------------------------------------------------------
+        2     |   3            | BMX160_ACCEL_RANGE_2G
+        4     |   5            | BMX160_ACCEL_RANGE_4G
+        8     |   8            | BMX160_ACCEL_RANGE_8G
+        16    |   12           | BMX160_ACCEL_RANGE_16G
         """
+
         self._accel_range = rangeconst
         if self._error_status == 0:
-            self.ACC_SCALAR = 1 / (AccelSensitivity2Gravity_values[rangeconst] * * g_TO_METERS_PER_SECOND_SQUARED)
+            ind = rangeconst >> 2  # convert to 0-3 range
+            self.ACC_SCALAR = 1 / (AccelSensitivity2Gravity_values[ind] * g_TO_METERS_PER_SECOND_SQUARED)
 
     @property
     def accel_odr(self):
