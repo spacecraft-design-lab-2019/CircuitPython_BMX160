@@ -115,11 +115,16 @@ BMX160_ACCEL_RANGE_4G                = const(0x05)
 BMX160_ACCEL_RANGE_8G                = const(0x08)
 BMX160_ACCEL_RANGE_16G               = const(0x0C)
 
-BMX160_ACCEL_RANGE_CONSTANTS = [BMX160_ACCEL_RANGE_16G,
-                                BMX160_ACCEL_RANGE_8G,
+# BMX160_ACCEL_RANGE_CONSTANTS = [BMX160_ACCEL_RANGE_16G,
+#                                 BMX160_ACCEL_RANGE_8G,
+#                                 BMX160_ACCEL_RANGE_4G,
+#                                 BMX160_ACCEL_RANGE_2G]
+# BMX160_ACCEL_RANGE_VALUES = [16, 8, 4, 2]
+BMX160_ACCEL_RANGE_CONSTANTS = [BMX160_ACCEL_RANGE_2G,
                                 BMX160_ACCEL_RANGE_4G,
-                                BMX160_ACCEL_RANGE_2G]
-BMX160_ACCEL_RANGE_VALUES = [16, 8, 4, 2]
+                                BMX160_ACCEL_RANGE_8G,
+                                BMX160_ACCEL_RANGE_16G]
+BMX160_ACCEL_RANGE_VALUES = [2, 4, 8, 16]
 
 
 # Gyro Range
@@ -231,6 +236,7 @@ BMX160_SPI_WR_MASK         = const(0x7F)
 
 # Error related
 BMX160_OK                  = const(0)
+BMX160_ERROR               = const(-1)
 
 # Each goes with a different sensitivity in decreasing order
 AccelSensitivity2Gravity_values = [2048, 4086, 8192, 16384]   # accelerometer sensitivity. See Section 1.2, Table 2
@@ -273,6 +279,8 @@ class BMX160:
     """
 
     # multiplicative constants
+
+    # NOTE THESE FIRST TWO GET SET IN THE INIT SEQUENCE
     ACC_SCALAR = 1/(AccelSensitivity2Gravity * g_TO_METERS_PER_SECOND_SQUARED) # 1 m/s^2 = 0.101971621 g
     GYR_SCALAR = 1/GyroSensitivity2DegPerSec_values[4]
     MAG_SCALAR = 1/16
@@ -431,10 +439,15 @@ class BMX160:
         if rangeconst in BMX160_GYRO_RANGE_CONSTANTS:
             self._gyro_range = rangeconst
         else:
-            return
+            return BMX160_ERROR
 
         if self._error_status == 0:
-            self.GYR_SCALAR = 1 / GyroSensitivity2DegPerSec_values[rangeconst]
+            val = BMX160_GYRO_RANGE_VALUES[rangeconst]
+            self.GYR_SCALAR = val / 32768.0
+        else:
+            return BMX160_ERROR
+
+        return BMX160_OK
 
     @property
     def gyro_odr(self):
@@ -486,10 +499,10 @@ class BMX160:
 
     def init_accel(self):
         # BW doesn't have an interface yet
-        self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_BW_NORMAL_AVG4)
-        self._accel_bwmode = BMX160_ACCEL_BW_NORMAL_AVG4
+        # self.write_u8(BMX160_ACCEL_CONFIG_ADDR, BMX160_ACCEL_BW_NORMAL_AVG4)
+        # self._accel_bwmode = BMX160_ACCEL_BW_NORMAL_AVG4
         # These rely on the setters to do their magic.
-        self.accel_range = BMX160_ACCEL_RANGE_2G
+        self.accel_range = BMX160_ACCEL_RANGE_8G
         self.accel_odr = 25
         self.accel_powermode = BMX160_ACCEL_NORMAL_MODE
 
@@ -513,11 +526,18 @@ class BMX160:
         if rangeconst in BMX160_ACCEL_RANGE_CONSTANTS:
             self._accel_range = rangeconst
         else:
-            return
+            return BMX160_ERROR
 
         if self._error_status == 0:
             ind = rangeconst >> 2  # convert to 0-3 range
-            self.ACC_SCALAR = 1 / (AccelSensitivity2Gravity_values[ind] * g_TO_METERS_PER_SECOND_SQUARED)
+            # self.ACC_SCALAR = 1 / (AccelSensitivity2Gravity_values[ind] * g_TO_METERS_PER_SECOND_SQUARED)
+            val = BMX160_ACCEL_RANGE_VALUES[ind]
+            self.ACC_SCALAR = (val / 32768.0) * g_TO_METERS_PER_SECOND_SQUARED
+        else:
+            return BMX160_ERROR
+
+        return BMX160_OK
+
 
     @property
     def accel_odr(self):
