@@ -438,16 +438,13 @@ class BMX160:
 
         if rangeconst in BMX160_GYRO_RANGE_CONSTANTS:
             self._gyro_range = rangeconst
-        else:
-            return BMX160_ERROR
-
-        if self._error_status == 0:
+            # read out the value to see if it changed successfully
+            rangeconst = self._gyro_range
             val = BMX160_GYRO_RANGE_VALUES[rangeconst]
-            self.GYR_SCALAR = val / 32768.0
+            self.GYR_SCALAR = (val / 32768.0)
         else:
-            return BMX160_ERROR
+            pass
 
-        return BMX160_OK
 
     @property
     def gyro_odr(self):
@@ -525,19 +522,14 @@ class BMX160:
 
         if rangeconst in BMX160_ACCEL_RANGE_CONSTANTS:
             self._accel_range = rangeconst
-        else:
-            return BMX160_ERROR
-
-        if self._error_status == 0:
-            ind = rangeconst >> 2  # convert to 0-3 range
-            # self.ACC_SCALAR = 1 / (AccelSensitivity2Gravity_values[ind] * g_TO_METERS_PER_SECOND_SQUARED)
+            # read out the value to see if it changed successfully
+            rangeconst = self._accel_range
+            # convert to 0-3 range
+            ind = rangeconst >> 2
             val = BMX160_ACCEL_RANGE_VALUES[ind]
-            self.ACC_SCALAR = (val / 32768.0) * g_TO_METERS_PER_SECOND_SQUARED
+            self.ACC_SCALAR = (val / 32768.0) / g_TO_METERS_PER_SECOND_SQUARED
         else:
-            return BMX160_ERROR
-
-        return BMX160_OK
-
+            pass
 
     @property
     def accel_odr(self):
