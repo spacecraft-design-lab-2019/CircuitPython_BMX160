@@ -21,7 +21,7 @@ time.sleep(0.05)
 ################### set up SD card through SPI  ###################
 
 spi = busio.SPI(board.SCK, MISO=board.MISO, MOSI=board.MOSI)
-cs_sd = DigitalInOut(board.A2)
+cs_sd = DigitalInOut(board.CS_SD)
 sdcard = adafruit_sdcard.SDCard(spi, cs_sd)
 
 # Use the filesystem as normal. Files are under "/sd"
@@ -53,7 +53,7 @@ def writerow(f, row):
 
 
 with open(filename, "a") as f:
-    header = ["magx", "magy", "magz", "gyrox", "gyroy", "gyroz", "accelx", "accely", "accelz", "sensortime"]
+    header = ["magx", "magy", "magz", "gyrox", "gyroy", "gyroz", "accelx", "accely", "accelz", "sensortime", "dt"]
     writerow(f, header)
 
 #################### Collect Data ####################
@@ -64,23 +64,24 @@ with open(filename, "a") as f:
     print("Begin Record")
     led[0] = [20, 255, 50]
     # RECORD FOR 12 HOURS
-    t0 = time.time()
-    while (time.time() - t0) < 3600*12:
+    t0 = time.monotonic()
+    while (time.monotonic() - t0) < 3600*12:
 
-        t1 = time.time()
-        led.brightness = 0.1
+        t1 = time.monotonic()
+        led[0] = [20, 255, 50]
         # Each returns a tuple, so adding them is the same as appending them to each other
-        data = bmx.mag + bmx.gyro + bmx.accel + (bmx.sensortime,)
+        data = bmx.mag + bmx.gyro + bmx.accel + (bmx.sensortime,) + (t1-t0,)
 
         writerow(f, data)
 
-        led.brightness = 0.01
+        led[0] = [255, 255, 50]
 
-        if (time.time() - t0)%60 < (1.05*rate):
-            print("Recorded for {} minutes".format((time.time() - t0)/60))
+
+        if (t1 - t0)%60 < (1.05*rate):
+            print("Recorded for {} minutes".format((t1 - t0)/60))
 
         # Wait if necessary to keep rate consistent
-        dif = time.time() - t1
+        dif = time.monotonic() - t1
         if dif < rate:
             time.sleep(rate-dif)
 
