@@ -432,8 +432,8 @@ class BMX160:
         250   |   3            |  BMX160_GYRO_RANGE_250_DPS
         125   |   4            |  BMX160_GYRO_RANGE_125_DPS
 
-
         ex: bmx.gyro_range = BMX160_GYRO_RANGE_500_DPS
+        equivalent to: bmx.gyro_range = 2
         """
 
         if rangeconst in BMX160_GYRO_RANGE_CONSTANTS:
@@ -518,13 +518,16 @@ class BMX160:
         4     |   5            | BMX160_ACCEL_RANGE_4G
         8     |   8            | BMX160_ACCEL_RANGE_8G
         16    |   12           | BMX160_ACCEL_RANGE_16G
+
+        ex: bmx.accel_range = BMX160_ACCEL_RANGE_4G
+        equivalent to: bmx.accel_range = 5
         """
 
         if rangeconst in BMX160_ACCEL_RANGE_CONSTANTS:
             self._accel_range = rangeconst
             # read out the value to see if it changed successfully
             rangeconst = self._accel_range
-            # convert to 0-3 range
+            # convert to 0-3 range for indexing
             ind = rangeconst >> 2
             val = BMX160_ACCEL_RANGE_VALUES[ind]
             self.ACC_SCALAR = (val / 32768.0) / g_TO_METERS_PER_SECOND_SQUARED
